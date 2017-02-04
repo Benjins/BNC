@@ -1,0 +1,1 @@
+cl /Zi /Od src/main.cpp /FeBNC.exe /Fobuild
