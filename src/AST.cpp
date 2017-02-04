@@ -223,6 +223,26 @@ bool ExpectAndEatOneOfWords(TokenStream* stream, const char** strs, const int co
 	return false;
 }
 
+const char* reservedWords[] = {
+	"if",
+	"while",
+	"void",
+	"int32",
+	"float",
+	"char",
+	"string"
+};
+
+bool IsReservedWord(const SubString& tok) {
+	for (int i = 0; i < BNS_ARRAY_COUNT(reservedWords); i++) {
+		if (tok == reservedWords[i]) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool ParseIdentifier(TokenStream* stream) {
 	if (stream->index >= stream->tokCount - 1) {
 		return false;
@@ -241,13 +261,15 @@ bool ParseIdentifier(TokenStream* stream) {
 		}
 
 		if (isValid) {
-			stream->index++;
+			if (!IsReservedWord(tok)) {
+				stream->index++;
 
-			ASTNode* node = stream->ast->addNode();
-			node->type = ANT_Identifier;
-			node->Identifier_value.name = tok;
+				ASTNode* node = stream->ast->addNode();
+				node->type = ANT_Identifier;
+				node->Identifier_value.name = tok;
 
-			return true;
+				return true;
+			}
 		}
 	}
 
