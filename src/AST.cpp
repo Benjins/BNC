@@ -109,25 +109,30 @@ bool ParseValue(TokenStream* stream) {
 	else if (ParseSingleValue(stream)) {
 		FRAME_SUCCES();
 	}
-	else {
-		if (ExpectAndEatWord(stream, "(")) {
-			if (ParseValue(stream)) {
-				if (ExpectAndEatWord(stream, ")")) {
-					FRAME_SUCCES();
-				}
-			}
-		}
-	}
 
 	return false;
 }
 
 bool ParseSingleValue(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
 	if (ParseIdentifier(stream)) {
-		return true;
+		FRAME_SUCCES();
 	}
 	else if (ParseIntLiteral(stream)) {
-		return true;
+		FRAME_SUCCES();
+	}
+	else if (ExpectAndEatWord(stream, "(")) {
+		if (ParseValue(stream)) {
+			if (ExpectAndEatWord(stream, ")")) {
+				ASTIndex idx = stream->ast->GetCurrIdx();
+
+				ASTNode* node = stream->ast->addNode();
+				node->type = ANT_Parentheses;
+				node->Parentheses_value.val = idx;
+
+				FRAME_SUCCES();
+			}
+		}
 	}
 
 	return false;
@@ -219,6 +224,11 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 		DisplayTree(root, indentation);
 	} break;
 
+	case ANT_Parentheses: {
+		ASTNode* val = &node->ast->nodes.data[node->Parentheses_value.val];
+		DisplayTree(val, indentation);
+	} break;
+
 	default: {
 		printf("Something went wrong...\n");
 		ASSERT(false);
@@ -271,15 +281,6 @@ void FixUpOperators(ASTNode* node) {
 
 		int idx = node->GetIndex();
 
-		//printf("Before (%d):\n", idx);
-		//DisplayTree(right);
-
-		//FixUpOperators(left);
-		//FixUpOperators(right);
-
-		//printf("After(%d):\n", idx);
-		//DisplayTree(right);
-
 		if (left->type == ANT_BinaryOp) {
 			// If the precedence is higher
 			const BinaryOperator* leftInfo = GetInfoForOp(left->BinaryOp_value.op);
@@ -295,10 +296,13 @@ void FixUpOperators(ASTNode* node) {
 		if (right->type == ANT_BinaryOp) {
 			// If the precedence is higher, or its equal and left-assoc (so most)
 			const BinaryOperator* rightInfo = GetInfoForOp(right->BinaryOp_value.op);
-			if (opInfo->precedence < rightInfo->precedence
-				|| (opInfo->precedence == rightInfo->precedence && opInfo->assoc == OA_Left)) {
+			if (opInfo->precedence < rightInfo->precedence) {
 				SwapBinaryOperators(node, right);
 				FixUpOperators(node);
+			}
+			else if (opInfo->precedence == rightInfo->precedence && opInfo->assoc == OA_Left) {
+				SwapBinaryOperators(node, right);
+				FixUpOperators(right);
 			}
 			else {
 				FixUpOperators(right);
@@ -311,9 +315,13 @@ void FixUpOperators(ASTNode* node) {
 		FixUpOperators(root);
 	}
 
+	case ANT_Parentheses: {
+		ASTNode* val = &node->ast->nodes.data[node->Parentheses_value.val];
+		FixUpOperators(val);
+	}
+
 	default: {
 	} break;
 	}
 }
-
 

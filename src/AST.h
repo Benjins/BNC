@@ -26,6 +26,7 @@ enum ASTNodeType {
 	ANT_FloatLiteral,
 	ANT_UnaryOp,
 	ANT_BinaryOp,
+	ANT_Parentheses,
 	ANT_Count
 };
 
@@ -126,6 +127,10 @@ struct AST_BinaryOp{
 	ASTIndex right;
 };
 
+struct AST_Parentheses {
+	ASTIndex val;
+};
+
 struct AST;
 
 struct ASTNode {
@@ -149,6 +154,7 @@ struct ASTNode {
 		AST_IntegerLiteral IntegerLiteral_value;
 		AST_Identifier     Identifier_value;
 		AST_Statement      Statement_value;
+		AST_Parentheses    Parentheses_value;
 	};
 
 	ASTIndex GetIndex();
