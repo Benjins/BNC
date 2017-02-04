@@ -228,23 +228,27 @@ struct TokenStream {
 
 struct __PushPopFrame {
 	TokenStream* stream;
+	bool success;
 	__PushPopFrame(TokenStream* _stream) {
 		stream = _stream;
 		_stream->PushFrame();
+		success = false;
 	}
 
 	~__PushPopFrame() {
-		if (stream != nullptr) {
+		if (success) {
+			stream->frames.PopBack();
+		}
+		else {
 			stream->PopFrame();
 		}
 	}
 };
 
 #define PUSH_STREAM_FRAME(stream) __PushPopFrame _frame_stream(stream)
-#define FRAME_SUCCES() _frame_stream.stream = nullptr; return true
+#define FRAME_SUCCES() _frame_stream.success = true; return true
 
 void ParseTokenStream(TokenStream* stream);
-
 bool ParseIntLiteral(TokenStream* stream);
 bool ParseBinaryOp(TokenStream* stream);
 bool ParseUnaryOp(TokenStream* stream);
@@ -254,6 +258,7 @@ bool ParseSingleValue(TokenStream* stream);
 bool ParseIdentifier(TokenStream* stream);
 bool ParseStatement(TokenStream* stream);
 
+bool CheckNextWord(TokenStream* stream, const char* str);
 bool ExpectAndEatWord(TokenStream* stream, const char* str);
 bool ExpectAndEatOneOfWords(TokenStream* stream, const char** strs, const int count, int* outIdx);
 

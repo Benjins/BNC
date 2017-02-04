@@ -100,10 +100,7 @@ bool ParseUnaryOp(TokenStream* stream) {
 
 bool ParseValue(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
-	if (ParseFunctionCall(stream)) {
-		FRAME_SUCCES();
-	}
-	else if (ParseBinaryOp(stream)) {
+	if (ParseBinaryOp(stream)) {
 		FRAME_SUCCES();
 	}
 	else if (ParseSingleValue(stream)) {
@@ -115,10 +112,7 @@ bool ParseValue(TokenStream* stream) {
 
 bool ParseSingleValue(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
-	if (ParseIdentifier(stream)) {
-		FRAME_SUCCES();
-	}
-	else if (ParseIntLiteral(stream)) {
+	if (ParseIntLiteral(stream)) {
 		FRAME_SUCCES();
 	}
 	else if (ExpectAndEatWord(stream, "(")) {
@@ -134,11 +128,57 @@ bool ParseSingleValue(TokenStream* stream) {
 			}
 		}
 	}
+	else if (ParseFunctionCall(stream)){
+		FRAME_SUCCES();
+	}
+	else if (ParseIdentifier(stream)) {
+		FRAME_SUCCES();
+	}
 
 	return false;
 }
 
 bool ParseFunctionCall(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+	if (ParseIdentifier(stream)) {
+		ASTIndex callIdx = stream->ast->GetCurrIdx();
+		if (ExpectAndEatWord(stream, "(")) {
+			Vector<ASTIndex> argIndices;
+			while (true) {
+				if (ParseValue(stream)) {
+					argIndices.PushBack(stream->ast->GetCurrIdx());
+
+					if (ExpectAndEatWord(stream, ",")) {
+						// Do nothing I guess?
+					}
+					else if (CheckNextWord(stream, ")")) {
+						break;
+					}
+					else {
+						return false;
+					}
+				}
+				else {
+					break;
+				}
+			}
+
+			if (ExpectAndEatWord(stream, ")")) {
+				ASTNode* node = stream->ast->addNode();
+				node->type = ANT_FunctionCall;
+				node->FunctionCall_value.func = callIdx;
+				node->FunctionCall_value.args = argIndices;
+
+				FRAME_SUCCES();
+			}
+		}
+		else {
+			// We got a var or something
+			// TODO: Other checks to make?
+			FRAME_SUCCES();
+		}
+	}
+
 	return false;
 }
 
@@ -149,6 +189,18 @@ bool ExpectAndEatWord(TokenStream* stream, const char* str) {
 
 	if (stream->CurrTok() == str) {
 		stream->index++;
+		return true;
+	}
+
+	return false;
+}
+
+bool CheckNextWord(TokenStream* stream, const char* str) {
+	if (stream->index >= stream->tokCount) {
+		return false;
+	}
+
+	if (stream->CurrTok() == str) {
 		return true;
 	}
 
@@ -227,6 +279,26 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 	case ANT_Parentheses: {
 		ASTNode* val = &node->ast->nodes.data[node->Parentheses_value.val];
 		DisplayTree(val, indentation);
+	} break;
+
+	case ANT_FunctionCall: {
+		INDENT(indentation);
+		ASTNode* call = &node->ast->nodes.data[node->FunctionCall_value.func];
+		printf("Calling func '%.*s'\n", BNS_LEN_START(call->Identifier_value.name));
+		for (int i = 0; i < node->FunctionCall_value.args.count; i++) {
+			ASTIndex argIdx = node->FunctionCall_value.args.data[i];
+			ASTNode* arg = &node->ast->nodes.data[argIdx];
+
+			INDENT(indentation);
+			printf("Arg %d: \n", i);
+
+			DisplayTree(arg, indentation + 1);
+		}
+	} break;
+
+	case ANT_Identifier: {
+		INDENT(indentation);
+		printf(" Identifier '%.*s'\n", BNS_LEN_START(node->Identifier_value.name));
 	} break;
 
 	default: {
@@ -319,6 +391,15 @@ void FixUpOperators(ASTNode* node) {
 		ASTNode* val = &node->ast->nodes.data[node->Parentheses_value.val];
 		FixUpOperators(val);
 	}
+
+	case ANT_FunctionCall: {
+		for (int i = 0; i < node->FunctionCall_value.args.count; i++) {
+			ASTIndex argIdx = node->FunctionCall_value.args.data[i];
+			ASTNode* arg = &node->ast->nodes.data[argIdx];
+
+			FixUpOperators(arg);
+		}
+	} break;
 
 	default: {
 	} break;
