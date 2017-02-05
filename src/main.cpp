@@ -11,7 +11,7 @@ int main(int argc, char** argv){
 	//printf("Yo.");
 
 	AST ast;
-	ast.ConstructFromString("calc(1 + 2, 3 + 4 *5, x + 2 * y);");
+	ast.ConstructFromString("!!!!calc(1 + 2, 3 + 4 *5, rr.x + 2 * !y.num);");
 
 	DisplayTree(&ast.nodes.Back());
 

@@ -19,6 +19,7 @@ enum ASTNodeType {
 	ANT_TypeGeneric,
 	ANT_TypePointer,
 	ANT_Statement,
+	ANT_FieldAccess,
 	ANT_IfStatement,
 	ANT_FunctionCall,
 	ANT_StringLiteral,
@@ -64,6 +65,11 @@ struct AST_Identifier {
 struct AST_ArrayAccess {
 	ASTIndex arr;
 	ASTIndex index;
+};
+
+struct AST_FieldAccess {
+	ASTIndex val;
+	ASTIndex field;
 };
 
 struct AST_TypeSimple{
@@ -155,6 +161,7 @@ struct ASTNode {
 		AST_Identifier     Identifier_value;
 		AST_Statement      Statement_value;
 		AST_Parentheses    Parentheses_value;
+		AST_FieldAccess    FieldAccess_value;
 	};
 
 	ASTIndex GetIndex();
@@ -257,6 +264,7 @@ bool ParseFunctionCall(TokenStream* stream);
 bool ParseSingleValue(TokenStream* stream);
 bool ParseIdentifier(TokenStream* stream);
 bool ParseStatement(TokenStream* stream);
+bool ParseFieldAccess(TokenStream* stream);
 
 bool CheckNextWord(TokenStream* stream, const char* str);
 bool ExpectAndEatWord(TokenStream* stream, const char* str);
@@ -285,8 +293,11 @@ const BinaryOperator binOpInfo[] = {
 	{ "+", OA_Left, 6 },
 	{ "-", OA_Left, 6 },
 	{ "*", OA_Left, 5 },
-	{ "/", OA_Left, 5 }
+	{ "/", OA_Left, 5 },
+	{ ".", OA_Left, 2}
 };
+
+const int unaryOpPrecedence = 3;
 
 void DisplayTree(ASTNode* node, int indentation = 0);
 

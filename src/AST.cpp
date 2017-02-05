@@ -68,8 +68,10 @@ bool ParseIntLiteral(TokenStream* stream) {
 }
 
 const char* binaryOperators[] = {
-	"*", "-", "+", "/"
+	"*", "-", "+", "/", "."
 };
+
+static_assert(BNS_ARRAY_COUNT(binaryOperators) == BNS_ARRAY_COUNT(binOpInfo), "Binary operator info");
 
 bool ParseBinaryOp(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
@@ -94,7 +96,27 @@ bool ParseBinaryOp(TokenStream* stream) {
 	return false;
 }
 
+const char* unaryOperators[] = {
+	"!", "-", "^", "&"
+};
+
 bool ParseUnaryOp(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+
+	int opIdx = -1;
+	if (ExpectAndEatOneOfWords(stream, unaryOperators, BNS_ARRAY_COUNT(unaryOperators), &opIdx)) {
+		if (ParseSingleValue(stream)) {
+			ASTIndex val = stream->ast->GetCurrIdx();
+
+			ASTNode* node = stream->ast->addNode();
+			node->type = ANT_UnaryOp;
+			node->UnaryOp_value.op = unaryOperators[opIdx];
+			node->UnaryOp_value.val = val;
+
+			FRAME_SUCCES();
+		}
+	}
+
 	return false;
 }
 
@@ -128,6 +150,9 @@ bool ParseSingleValue(TokenStream* stream) {
 			}
 		}
 	}
+	else if (ParseUnaryOp(stream)) {
+		FRAME_SUCCES();
+	}
 	else if (ParseFunctionCall(stream)){
 		FRAME_SUCCES();
 	}
@@ -137,6 +162,29 @@ bool ParseSingleValue(TokenStream* stream) {
 
 	return false;
 }
+
+/*
+bool ParseFieldAccess(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+	if (ParseSingleValue(stream)) {
+		ASTIndex valIdx = stream->ast->GetCurrIdx();
+		if (ExpectAndEatWord(stream, ".")) {
+			if (ParseIdentifier(stream)) {
+				ASTIndex fieldIdx = stream->ast->GetCurrIdx();
+
+				ASTNode* node = stream->ast->addNode();
+				node->type = ANT_FieldAccess;
+				node->FieldAccess_value.field = fieldIdx;
+				node->FieldAccess_value.val = valIdx;
+
+				FRAME_SUCCES();
+			}
+		}
+	}
+
+	return false;
+}
+*/
 
 bool ParseFunctionCall(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
@@ -318,9 +366,30 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 		}
 	} break;
 
+	case ANT_UnaryOp: {
+		INDENT(indentation);
+		printf("Unary Op: '%s'\n", node->UnaryOp_value.op);
+
+		ASTNode* val = &node->ast->nodes.data[node->UnaryOp_value.val];
+		DisplayTree(val, indentation + 1);
+	} break;
+
+	case ANT_FieldAccess: {
+		INDENT(indentation);
+		printf("Field access:\n");
+
+		ASTNode* val   = &node->ast->nodes.data[node->FieldAccess_value.val];
+		ASTNode* field = &node->ast->nodes.data[node->FieldAccess_value.field];
+
+		INDENT(indentation);
+		printf("Accessing '%.*s'\n", BNS_LEN_START(field->Identifier_value.name));
+
+		DisplayTree(val, indentation + 1);
+	} break;
+
 	case ANT_Identifier: {
 		INDENT(indentation);
-		printf(" Identifier '%.*s'\n", BNS_LEN_START(node->Identifier_value.name));
+		printf("Identifier '%.*s'\n", BNS_LEN_START(node->Identifier_value.name));
 	} break;
 
 	default: {
@@ -386,6 +455,21 @@ void FixUpOperators(ASTNode* node) {
 				FixUpOperators(left);
 			}
 		}
+		else if (left->type == ANT_UnaryOp) {
+			if (opInfo->precedence < unaryOpPrecedence) {
+				AST_BinaryOp tmp = node->BinaryOp_value;
+				node->UnaryOp_value = left->UnaryOp_value;
+				left->BinaryOp_value = tmp;
+				
+				left->BinaryOp_value.left = node->UnaryOp_value.val;
+				node->UnaryOp_value.val = left->GetIndex();
+
+				node->type = ANT_UnaryOp;
+				left->type = ANT_BinaryOp;
+
+				node = left;
+			}
+		}
 
 		if (right->type == ANT_BinaryOp) {
 			// If the precedence is higher, or its equal and left-assoc (so most)
@@ -407,12 +491,22 @@ void FixUpOperators(ASTNode* node) {
 	case ANT_Statement: {
 		ASTNode* root = &node->ast->nodes.data[node->Statement_value.root];
 		FixUpOperators(root);
-	}
+	} break;
 
 	case ANT_Parentheses: {
 		ASTNode* val = &node->ast->nodes.data[node->Parentheses_value.val];
 		FixUpOperators(val);
-	}
+	} break;
+
+	case ANT_UnaryOp: {
+		ASTNode* val = &node->ast->nodes.data[node->UnaryOp_value.val];
+		FixUpOperators(val);
+	} break;
+
+	case ANT_FieldAccess: {
+		ASTNode* val = &node->ast->nodes.data[node->FieldAccess_value.val];
+		FixUpOperators(val);
+	} break;
 
 	case ANT_FunctionCall: {
 		for (int i = 0; i < node->FunctionCall_value.args.count; i++) {
