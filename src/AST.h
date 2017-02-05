@@ -13,12 +13,15 @@ enum ASTNodeType {
 	ANT_FunctionDef,
 	ANT_Parameter,
 	ANT_VariableDecl,
+	ANT_VariableAssign,
 	ANT_Identifier,
 	ANT_ArrayAccess,
 	ANT_TypeArray,
 	ANT_TypeGeneric,
 	ANT_TypePointer,
+	ANT_TypeSimple,
 	ANT_Statement,
+	ANT_Scope,
 	ANT_FieldAccess,
 	ANT_IfStatement,
 	ANT_FunctionCall,
@@ -53,9 +56,14 @@ struct ANT_Parameter {
 	ASTIndex name;
 };
 
-struct AST_VariableDecl{
+struct AST_VariableDecl {
 	ASTIndex type;
-	SubString varName;
+	ASTIndex varName;
+};
+
+struct AST_VariableAssign {
+	ASTIndex var;
+	ASTIndex val;
 };
 
 struct AST_Identifier {
@@ -73,7 +81,7 @@ struct AST_FieldAccess {
 };
 
 struct AST_TypeSimple{
-	SubString name;
+	ASTIndex name;
 };
 struct AST_TypeArray{
 	ASTIndex childType;
@@ -93,13 +101,18 @@ struct AST_Statement {
 	ASTIndex root;
 };
 
+struct AST_Scope {
+	Vector<ASTIndex> statements;
+};
+
 struct AST_IfStatement{
 	ASTIndex condition;
-	Vector<ASTIndex> body;
+	ASTIndex bodyScope;
 };
 
 struct AST_WhileStatement {
-	// TODO
+	ASTIndex condition;
+	ASTIndex bodyScope;
 };
 
 struct AST_FunctionCall{
@@ -149,7 +162,7 @@ struct ASTNode {
 
 		int startOfUnion = BNS_OFFSET_OF(ASTNode, type) + sizeof(type);
 		int unionSize = sizeof(ASTNode) - startOfUnion;
-		// FFFFFFFFFFFFFF
+		// fffffuuuuuuhhhhhh
 		MemSet(((char*)this) + startOfUnion, 0, unionSize);
 	}
 
@@ -162,6 +175,10 @@ struct ASTNode {
 		AST_Statement      Statement_value;
 		AST_Parentheses    Parentheses_value;
 		AST_FieldAccess    FieldAccess_value;
+		AST_VariableAssign VariableAssign_value;
+		AST_VariableDecl   VariableDecl_value;
+		AST_TypeSimple     TypeSimple_value;
+		AST_Scope          Scope_value;
 	};
 
 	ASTIndex GetIndex();
@@ -262,9 +279,17 @@ bool ParseUnaryOp(TokenStream* stream);
 bool ParseValue(TokenStream* stream);
 bool ParseFunctionCall(TokenStream* stream);
 bool ParseSingleValue(TokenStream* stream);
+bool ParseKeyword(TokenStream* stream);
 bool ParseIdentifier(TokenStream* stream);
 bool ParseStatement(TokenStream* stream);
 bool ParseFieldAccess(TokenStream* stream);
+bool ParseVariableAssign(TokenStream* stream);
+bool ParseVariableDecl(TokenStream* stream);
+bool ParseType(TokenStream* stream);
+bool ParseGenericType(TokenStream* stream);
+bool ParseArrayType(TokenStream* stream);
+bool ParsePointerType(TokenStream* stream);
+bool ParseScope(TokenStream* stream);
 
 bool CheckNextWord(TokenStream* stream, const char* str);
 bool ExpectAndEatWord(TokenStream* stream, const char* str);

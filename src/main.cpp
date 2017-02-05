@@ -11,11 +11,11 @@ int main(int argc, char** argv){
 	//printf("Yo.");
 
 	AST ast;
-	ast.ConstructFromString("!!!!calc(1 + 2, 3 + 4 *5, rr.x + 2 * !y.num);");
+	ast.ConstructFromString("{ xc : int32 ; x = 2 * 3; }");
 
-	DisplayTree(&ast.nodes.Back());
+	//DisplayTree(&ast.nodes.Back());
 
-	printf("Fixing up ops...\n\n");
+	//printf("Fixing up ops...\n\n");
 
 	FixUpOperators(&ast.nodes.Back());
 	DisplayTree(&ast.nodes.Back());

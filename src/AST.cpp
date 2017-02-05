@@ -29,17 +29,33 @@ void ParseTokenStream(TokenStream* stream) {
 
 bool ParseStatement(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
-	if (ParseValue(stream)) {
-		if (stream->index < stream->tokCount) {
-			if (ExpectAndEatWord(stream, ";")) {
-				ASTIndex root = stream->ast->GetCurrIdx();
+	bool needsSemicolon = true;
+	if (ParseVariableAssign(stream)) {
+	}
+	else if (ParseVariableDecl(stream)) {
 
-				ASTNode* node = stream->ast->addNode();
-				node->type = ANT_Statement;
-				node->Statement_value.root = root;
+	}
+	else if (ParseValue(stream)) {
+	}
+	else if (ParseScope(stream)) {
+		needsSemicolon = false;
+	}
+	else {
+		return false;
+	}
 
-				FRAME_SUCCES();
-			}
+	if (!needsSemicolon) {
+		FRAME_SUCCES();
+	}
+	else if (stream->index < stream->tokCount) {
+		if (ExpectAndEatWord(stream, ";")) {
+			ASTIndex root = stream->ast->GetCurrIdx();
+
+			ASTNode* node = stream->ast->addNode();
+			node->type = ANT_Statement;
+			node->Statement_value.root = root;
+
+			FRAME_SUCCES();
 		}
 	}
 
@@ -163,28 +179,31 @@ bool ParseSingleValue(TokenStream* stream) {
 	return false;
 }
 
-/*
-bool ParseFieldAccess(TokenStream* stream) {
-	PUSH_STREAM_FRAME(stream);
-	if (ParseSingleValue(stream)) {
-		ASTIndex valIdx = stream->ast->GetCurrIdx();
-		if (ExpectAndEatWord(stream, ".")) {
-			if (ParseIdentifier(stream)) {
-				ASTIndex fieldIdx = stream->ast->GetCurrIdx();
+bool ParseType(TokenStream* stream) {
+	if (ParseIdentifier(stream)) {
+		ASTIndex identIdx = stream->ast->GetCurrIdx();
 
-				ASTNode* node = stream->ast->addNode();
-				node->type = ANT_FieldAccess;
-				node->FieldAccess_value.field = fieldIdx;
-				node->FieldAccess_value.val = valIdx;
+		ASTNode* node = stream->ast->addNode();
+		node->type = ANT_TypeSimple;
+		node->TypeSimple_value.name = identIdx;
 
-				FRAME_SUCCES();
-			}
-		}
+		return true;
 	}
 
 	return false;
 }
-*/
+
+bool ParseGenericType(TokenStream* stream) {
+	return false;
+}
+
+bool ParseArrayType(TokenStream* stream) {
+	return false;
+}
+
+bool ParsePointerType(TokenStream* stream) {
+	return false;
+}
 
 bool ParseFunctionCall(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
@@ -273,12 +292,7 @@ bool ExpectAndEatOneOfWords(TokenStream* stream, const char** strs, const int co
 
 const char* reservedWords[] = {
 	"if",
-	"while",
-	"void",
-	"int32",
-	"float",
-	"char",
-	"string"
+	"while"
 };
 
 bool IsReservedWord(const SubString& tok) {
@@ -317,6 +331,78 @@ bool ParseIdentifier(TokenStream* stream) {
 				node->Identifier_value.name = tok;
 
 				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+bool ParseVariableDecl(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+	if (ParseIdentifier(stream)) {
+		ASTIndex varIdx = stream->ast->GetCurrIdx();
+		if (ExpectAndEatWord(stream, ":")) {
+			if (ParseType(stream)) {
+				ASTIndex typeIdx = stream->ast->GetCurrIdx();
+
+				ASTNode* node = stream->ast->addNode();
+				node->type = ANT_VariableDecl;
+				node->VariableDecl_value.varName = varIdx;
+				node->VariableDecl_value.type = typeIdx;
+
+				FRAME_SUCCES();
+			}
+		}
+	}
+
+	return false;
+}
+
+bool ParseScope(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+	if (ExpectAndEatWord(stream, "{")) {
+		Vector<ASTIndex> statements;
+		while (true) {
+			if (ParseStatement(stream)) {
+				ASTIndex stmtIdx = stream->ast->GetCurrIdx();
+				statements.PushBack(stmtIdx);
+			}
+			else if (CheckNextWord(stream, "}")) {
+				break;
+			}
+			else {
+				return false;
+			}
+		}
+
+		if (ExpectAndEatWord(stream, "}")) {
+			ASTNode* node = stream->ast->addNode();
+			node->type = ANT_Scope;
+			node->Scope_value.statements = statements;
+
+			FRAME_SUCCES();
+		}
+	}
+
+	return false;
+}
+
+bool ParseVariableAssign(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+
+	if (ParseValue(stream)) {
+		ASTIndex varIdx = stream->ast->GetCurrIdx();
+		if (ExpectAndEatWord(stream, "=")) {
+			if (ParseValue(stream)) {
+				ASTIndex valIdx = stream->ast->GetCurrIdx();
+
+				ASTNode* node = stream->ast->addNode();
+				node->type = ANT_VariableAssign;
+				node->VariableAssign_value.val = valIdx;
+				node->VariableAssign_value.var = varIdx;
+
+				FRAME_SUCCES();
 			}
 		}
 	}
@@ -374,6 +460,28 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 		DisplayTree(val, indentation + 1);
 	} break;
 
+	case ANT_VariableAssign: {
+		ASTNode* var = &node->ast->nodes.data[node->VariableAssign_value.var];
+
+		INDENT(indentation);
+		printf("Assign to var: '%.*s'\n", BNS_LEN_START(var->Identifier_value.name));
+
+		ASTNode* val = &node->ast->nodes.data[node->VariableAssign_value.val];
+		DisplayTree(val, indentation + 1);
+	} break;
+
+	case ANT_VariableDecl: {
+		ASTNode* varName = &node->ast->nodes.data[node->VariableDecl_value.varName];
+
+		INDENT(indentation);
+		printf("Declaring var: '%.*s'\n", BNS_LEN_START(varName->Identifier_value.name));
+		INDENT(indentation);
+		printf("With type\n");
+
+		ASTNode* type = &node->ast->nodes.data[node->VariableDecl_value.type];
+		DisplayTree(type, indentation + 1);
+	} break;
+
 	case ANT_FieldAccess: {
 		INDENT(indentation);
 		printf("Field access:\n");
@@ -390,6 +498,24 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 	case ANT_Identifier: {
 		INDENT(indentation);
 		printf("Identifier '%.*s'\n", BNS_LEN_START(node->Identifier_value.name));
+	} break;
+
+	case ANT_Scope: {
+		INDENT(indentation);
+		printf("Scope.\n");
+
+		for (int i = 0; i < node->Scope_value.statements.count; i++) {
+			ASTIndex statementIdx = node->Scope_value.statements.data[i];
+			ASTNode* stmt = &node->ast->nodes.data[statementIdx];
+
+			DisplayTree(stmt, indentation + 1);
+		}
+	} break;
+
+	case ANT_TypeSimple: {
+		ASTNode* type = &node->ast->nodes.data[node->TypeSimple_value.name];
+		INDENT(indentation);
+		printf("Type '%.*s'\n", BNS_LEN_START(type->Identifier_value.name));
 	} break;
 
 	default: {
@@ -506,6 +632,20 @@ void FixUpOperators(ASTNode* node) {
 	case ANT_FieldAccess: {
 		ASTNode* val = &node->ast->nodes.data[node->FieldAccess_value.val];
 		FixUpOperators(val);
+	} break;
+
+	case ANT_VariableAssign: {
+		ASTNode* val = &node->ast->nodes.data[node->VariableAssign_value.val];
+		FixUpOperators(val);
+	} break;
+
+	case ANT_Scope: {
+		for (int i = 0; i < node->Scope_value.statements.count; i++) {
+			ASTIndex statementIdx = node->Scope_value.statements.data[i];
+			ASTNode* stmt = &node->ast->nodes.data[statementIdx];
+
+			FixUpOperators(stmt);
+		}
 	} break;
 
 	case ANT_FunctionCall: {
