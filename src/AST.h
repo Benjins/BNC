@@ -179,6 +179,7 @@ struct ASTNode {
 		AST_VariableDecl   VariableDecl_value;
 		AST_TypeSimple     TypeSimple_value;
 		AST_Scope          Scope_value;
+		AST_IfStatement    IfStatement_value;
 	};
 
 	ASTIndex GetIndex();
@@ -290,6 +291,7 @@ bool ParseGenericType(TokenStream* stream);
 bool ParseArrayType(TokenStream* stream);
 bool ParsePointerType(TokenStream* stream);
 bool ParseScope(TokenStream* stream);
+bool ParseIfStatement(TokenStream* stream);
 
 bool CheckNextWord(TokenStream* stream, const char* str);
 bool ExpectAndEatWord(TokenStream* stream, const char* str);
@@ -315,11 +317,12 @@ struct BinaryOperator {
 };
 
 const BinaryOperator binOpInfo[] = {
-	{ "+", OA_Left, 6 },
-	{ "-", OA_Left, 6 },
-	{ "*", OA_Left, 5 },
-	{ "/", OA_Left, 5 },
-	{ ".", OA_Left, 2}
+	{ "+",  OA_Left, 6 },
+	{ "-",  OA_Left, 6 },
+	{ "*",  OA_Left, 5 },
+	{ "/",  OA_Left, 5 },
+	{ ".",  OA_Left, 2 },
+	{ "==", OA_Left, 9 }
 };
 
 const int unaryOpPrecedence = 3;

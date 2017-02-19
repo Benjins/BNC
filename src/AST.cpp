@@ -35,10 +35,14 @@ bool ParseStatement(TokenStream* stream) {
 	else if (ParseVariableDecl(stream)) {
 
 	}
-	else if (ParseValue(stream)) {
+	else if (ParseIfStatement(stream)) {
+		needsSemicolon = false;
 	}
 	else if (ParseScope(stream)) {
 		needsSemicolon = false;
+	}
+	else if (ParseValue(stream)) {
+
 	}
 	else {
 		return false;
@@ -84,7 +88,7 @@ bool ParseIntLiteral(TokenStream* stream) {
 }
 
 const char* binaryOperators[] = {
-	"*", "-", "+", "/", "."
+	"*", "-", "+", "/", ".", "=="
 };
 
 static_assert(BNS_ARRAY_COUNT(binaryOperators) == BNS_ARRAY_COUNT(binOpInfo), "Binary operator info");
@@ -180,6 +184,10 @@ bool ParseSingleValue(TokenStream* stream) {
 }
 
 bool ParseType(TokenStream* stream) {
+	//if (ParseFunctionCall(stream)) {
+	//	ANT_TypeGeneric
+	//	stream->ast->nodes;
+	//}
 	if (ParseIdentifier(stream)) {
 		ASTIndex identIdx = stream->ast->GetCurrIdx();
 
@@ -410,6 +418,28 @@ bool ParseVariableAssign(TokenStream* stream) {
 	return false;
 }
 
+bool ParseIfStatement(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+
+	if (ExpectAndEatWord(stream, "if")) {
+		if (ParseValue(stream)) {
+			ASTIndex condIdx = stream->ast->GetCurrIdx();
+			if (ParseScope(stream)) {
+				ASTIndex scopeIdx = stream->ast->GetCurrIdx();
+
+				ASTNode* node = stream->ast->addNode();
+				node->type = ANT_IfStatement;
+				node->IfStatement_value.condition = condIdx;
+				node->IfStatement_value.bodyScope = scopeIdx;
+
+				FRAME_SUCCES();
+			}
+		}
+	}
+
+	return false;
+}
+
 void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 #define INDENT(x) for (int i = 0; i < x; i++) {printf("    ");}
 	switch (node->type) {
@@ -512,6 +542,30 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 		}
 	} break;
 
+	case ANT_IfStatement: {
+		INDENT(indentation);
+		printf("If statement.\n");
+		INDENT(indentation);
+		printf("Condition:\n");
+
+		{
+			ASTIndex condIndex = node->IfStatement_value.condition;
+			ASTNode* cond = &node->ast->nodes.data[condIndex];
+
+			DisplayTree(cond, indentation + 1);
+		}
+
+		INDENT(indentation);
+		printf("Body:\n");
+		{
+			ASTIndex bodyIndex = node->IfStatement_value.bodyScope;
+			ASTNode* body = &node->ast->nodes.data[bodyIndex];
+
+			DisplayTree(body, indentation + 1);
+		}
+
+	} break;
+
 	case ANT_TypeSimple: {
 		ASTNode* type = &node->ast->nodes.data[node->TypeSimple_value.name];
 		INDENT(indentation);
@@ -563,6 +617,8 @@ void SwapBinaryOperators(ASTNode* parent, ASTNode* child) {
 void FixUpOperators(ASTNode* node) {
 	switch (node->type) {
 	case ANT_BinaryOp: {
+		//printf("Before:\n");
+		//DisplayTree(node);
 		ASTNode* left = &node->ast->nodes.data[node->BinaryOp_value.left];
 		ASTNode* right = &node->ast->nodes.data[node->BinaryOp_value.right];
 
@@ -575,6 +631,7 @@ void FixUpOperators(ASTNode* node) {
 			const BinaryOperator* leftInfo = GetInfoForOp(left->BinaryOp_value.op);
 			if (opInfo->precedence < leftInfo->precedence) {
 				SwapBinaryOperators(node, left);
+				printf("Swap node w/ left.\n");
 				FixUpOperators(node);
 			}
 			else {
@@ -601,17 +658,33 @@ void FixUpOperators(ASTNode* node) {
 			// If the precedence is higher, or its equal and left-assoc (so most)
 			const BinaryOperator* rightInfo = GetInfoForOp(right->BinaryOp_value.op);
 			if (opInfo->precedence < rightInfo->precedence) {
+				ASTIndex oldNodeIdx = node - node->ast->nodes.data;
 				SwapBinaryOperators(node, right);
+				ASTIndex oldLeft = node->BinaryOp_value.left;
 				FixUpOperators(node);
 			}
 			else if (opInfo->precedence == rightInfo->precedence && opInfo->assoc == OA_Left) {
 				SwapBinaryOperators(node, right);
-				FixUpOperators(right);
+				FixUpOperators(node);
 			}
 			else {
 				FixUpOperators(right);
 			}
 		}
+
+		if (right->type == ANT_BinaryOp) {
+			// If the precedence is higher, or its equal and left-assoc (so most)
+			const BinaryOperator* rightInfo = GetInfoForOp(right->BinaryOp_value.op);
+			if (opInfo->precedence < rightInfo->precedence) {
+				SwapBinaryOperators(node, right);
+			}
+			else if (opInfo->precedence == rightInfo->precedence && opInfo->assoc == OA_Left) {
+				SwapBinaryOperators(node, right);
+			}
+		}
+
+		//printf("After:\n");
+		//DisplayTree(node);
 	} break;
 
 	case ANT_Statement: {
@@ -654,6 +727,22 @@ void FixUpOperators(ASTNode* node) {
 			ASTNode* arg = &node->ast->nodes.data[argIdx];
 
 			FixUpOperators(arg);
+		}
+	} break;
+
+	case ANT_IfStatement: {
+		{
+			ASTIndex condIndex = node->IfStatement_value.condition;
+			ASTNode* cond = &node->ast->nodes.data[condIndex];
+
+			FixUpOperators(cond);
+		}
+
+		{
+			ASTIndex bodyIndex = node->IfStatement_value.bodyScope;
+			ASTNode* body = &node->ast->nodes.data[bodyIndex];
+
+			FixUpOperators(body);
 		}
 	} break;
 
