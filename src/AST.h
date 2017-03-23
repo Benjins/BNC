@@ -136,6 +136,7 @@ struct AST_FloatLiteral{
 struct AST_UnaryOp{
 	const char* op;
 	ASTIndex val;
+	bool isPre;
 };
 
 struct AST_BinaryOp{
@@ -350,7 +351,31 @@ const char* binaryOperators[] = {
 	"*", "-", "+", "/", ".", "==", "<=", "<", ">", ">="
 };
 
+enum UnaryOperatorPos {
+	UOP_Pre = (1 << 0),
+	UOP_Post = (1 << 1),
+	UOP_Both = UOP_Pre | UOP_Post
+};
+
+struct UnaryOperator {
+	const char* op;
+	UnaryOperatorPos pos;
+};
+
+UnaryOperator unOpInfo[] = {
+	{ "!",  UOP_Pre },
+	{ "-",  UOP_Pre },
+	{ "^",  UOP_Both },
+	{ "++", UOP_Post },
+	{ "--", UOP_Post }
+};
+
+const char* unaryOperators[] = {
+	"!", "-", "^", "++", "--"
+};
+
 static_assert(BNS_ARRAY_COUNT(binaryOperators) == BNS_ARRAY_COUNT(binOpInfo), "Binary operator info");
+static_assert(BNS_ARRAY_COUNT(unaryOperators)  == BNS_ARRAY_COUNT(unOpInfo),  "Unary  operator info");
 
 const int unaryOpPrecedence = 3;
 

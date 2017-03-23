@@ -1,3 +1,4 @@
+/*
 vec3 :: struct {
 	x: float = 0;
 	y: float = 0;
@@ -8,11 +9,13 @@ vec2 :: struct {
 	x : float;
 	y : float;
 }
+*/
 
 pow :: (b : int, e : int) -> int {
-	return b * e;
+	return -b.xc * e;
 }
 
+/*
 nullary :: () -> void {
 	printf("gg\%s", "ssg");
 
@@ -21,6 +24,7 @@ nullary :: () -> void {
 		printf("x is %d\n", x);
 	}
 }
+*/
 
 //Vector :: struct(T : Type) {
 //	T val;

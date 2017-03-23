@@ -1,6 +1,26 @@
 #include "AST.h"
 #include "../CppUtils/lexer.h"
 
+const BinaryOperator* GetBinaryInfoForOp(const char* op) {
+	for (int i = 0; i < BNS_ARRAY_COUNT(binOpInfo); i++) {
+		if (StrEqual(op, binOpInfo[i].op)) {
+			return &binOpInfo[i];
+		}
+	}
+
+	return nullptr;
+}
+
+const UnaryOperator* GetUnaryInfoForOp(const char* op) {
+	for (int i = 0; i < BNS_ARRAY_COUNT(unOpInfo); i++) {
+		if (StrEqual(op, unOpInfo[i].op)) {
+			return &unOpInfo[i];
+		}
+	}
+
+	return nullptr;
+}
+
 ASTIndex ASTNode::GetIndex() {
 	return this - ast->nodes.data;
 }
@@ -160,26 +180,43 @@ bool ParseBinaryOp(TokenStream* stream) {
 	return false;
 }
 
-const char* unaryOperators[] = {
-	"!", "-", "^", "&"
-};
-
 bool ParseUnaryOp(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
 
 	int opIdx = -1;
 	if (ExpectAndEatOneOfWords(stream, unaryOperators, BNS_ARRAY_COUNT(unaryOperators), &opIdx)) {
-		if (ParseSingleValue(stream)) {
-			ASTIndex val = stream->ast->GetCurrIdx();
+		if (const UnaryOperator* op = GetUnaryInfoForOp(unaryOperators[opIdx])) {
+			if (op->pos & UOP_Pre) {
+				if (ParseSingleValue(stream)) {
+					ASTIndex val = stream->ast->GetCurrIdx();
 
-			ASTNode* node = stream->ast->addNode();
-			node->type = ANT_UnaryOp;
-			node->UnaryOp_value.op = unaryOperators[opIdx];
-			node->UnaryOp_value.val = val;
+					ASTNode* node = stream->ast->addNode();
+					node->type = ANT_UnaryOp;
+					node->UnaryOp_value.op = unaryOperators[opIdx];
+					node->UnaryOp_value.val = val;
+					node->UnaryOp_value.isPre = true;
 
-			FRAME_SUCCES();
+					FRAME_SUCCES();
+				}
+			}
 		}
 	}
+	/*
+	else if (ParseSingleValue(stream)) {
+		ASTIndex val = stream->ast->GetCurrIdx();
+		if (ExpectAndEatOneOfWords(stream, unaryOperators, BNS_ARRAY_COUNT(unaryOperators), &opIdx)) {
+			if (const UnaryOperator* op = GetUnaryInfoForOp(unaryOperators[opIdx])) {
+				if (op->pos & UOP_Post) {
+					ASTNode* node = stream->ast->addNode();
+					node->type = ANT_UnaryOp;
+					node->UnaryOp_value.op = unaryOperators[opIdx];
+					node->UnaryOp_value.val = val;
+
+					FRAME_SUCCES();
+				}
+			}
+		}
+	}*/
 
 	return false;
 }
@@ -676,7 +713,7 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 
 	case ANT_UnaryOp: {
 		INDENT(indentation);
-		printf("Unary Op: '%s'\n", node->UnaryOp_value.op);
+		printf("Unary Op: '%s' (%s)\n", node->UnaryOp_value.op, (node->UnaryOp_value.isPre ? "pre" : "post"));
 
 		ASTNode* val = &node->ast->nodes.data[node->UnaryOp_value.val];
 		DisplayTree(val, indentation + 1);
@@ -841,16 +878,6 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 	}
 }
 
-const BinaryOperator* GetInfoForOp(const char* op) {
-	for (int i = 0; i < BNS_ARRAY_COUNT(binOpInfo); i++) {
-		if (StrEqual(op, binOpInfo[i].op)) {
-			return &binOpInfo[i];
-		}
-	}
-
-	return nullptr;
-}
-
 void SwapBinaryOperators(ASTNode* parent, ASTNode* child) {
 	ASSERT(parent->type == ANT_BinaryOp);
 	ASSERT(child->type == ANT_BinaryOp);
@@ -884,13 +911,13 @@ void FixUpOperators(ASTNode* node) {
 		ASTNode* left = &node->ast->nodes.data[node->BinaryOp_value.left];
 		ASTNode* right = &node->ast->nodes.data[node->BinaryOp_value.right];
 
-		const BinaryOperator* opInfo = GetInfoForOp(node->BinaryOp_value.op);
+		const BinaryOperator* opInfo = GetBinaryInfoForOp(node->BinaryOp_value.op);
 
 		int idx = node->GetIndex();
 
 		if (left->type == ANT_BinaryOp) {
 			// If the precedence is higher
-			const BinaryOperator* leftInfo = GetInfoForOp(left->BinaryOp_value.op);
+			const BinaryOperator* leftInfo = GetBinaryInfoForOp(left->BinaryOp_value.op);
 			if (opInfo->precedence < leftInfo->precedence) {
 				SwapBinaryOperators(node, left);
 				printf("Swap node w/ left.\n");
@@ -918,7 +945,7 @@ void FixUpOperators(ASTNode* node) {
 
 		if (right->type == ANT_BinaryOp) {
 			// If the precedence is higher, or its equal and left-assoc (so most)
-			const BinaryOperator* rightInfo = GetInfoForOp(right->BinaryOp_value.op);
+			const BinaryOperator* rightInfo = GetBinaryInfoForOp(right->BinaryOp_value.op);
 			if (opInfo->precedence < rightInfo->precedence) {
 				ASTIndex oldNodeIdx = node - node->ast->nodes.data;
 				SwapBinaryOperators(node, right);
@@ -936,7 +963,7 @@ void FixUpOperators(ASTNode* node) {
 
 		if (right->type == ANT_BinaryOp) {
 			// If the precedence is higher, or its equal and left-assoc (so most)
-			const BinaryOperator* rightInfo = GetInfoForOp(right->BinaryOp_value.op);
+			const BinaryOperator* rightInfo = GetBinaryInfoForOp(right->BinaryOp_value.op);
 			if (opInfo->precedence < rightInfo->precedence) {
 				SwapBinaryOperators(node, right);
 			}
