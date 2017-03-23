@@ -10,7 +10,7 @@ enum ASTNodeType {
 	ANT_Invalid = -1,
 	ANT_StructField,
 	ANT_StructDefinition,
-	ANT_FunctionDef,
+	ANT_FunctionDefinition,
 	ANT_Parameter,
 	ANT_VariableDecl,
 	ANT_VariableAssign,
@@ -31,17 +31,18 @@ enum ASTNodeType {
 	ANT_UnaryOp,
 	ANT_BinaryOp,
 	ANT_Parentheses,
+	ANT_ReturnStatement,
 	ANT_Root,
 	ANT_Count
 };
 
 typedef int ASTIndex;
 
-struct AST_FunctionDef {
+struct AST_FunctionDefinition {
 	ASTIndex name;
 	Vector<ASTIndex> params;
 	ASTIndex returnType;
-	Vector<ASTIndex> bodyStatements;
+	ASTIndex bodyScope;
 };
 
 struct ANT_Parameter {
@@ -102,6 +103,10 @@ struct AST_Scope {
 struct AST_IfStatement{
 	ASTIndex condition;
 	ASTIndex bodyScope;
+};
+
+struct AST_ReturnStatement {
+	ASTIndex retVal;
 };
 
 struct AST_WhileStatement {
@@ -170,27 +175,30 @@ struct ASTNode {
 	}
 
 	union {
-		AST_BinaryOp         BinaryOp_value;
-		AST_UnaryOp          UnaryOp_value;
-		AST_FunctionCall     FunctionCall_value;
-		AST_IntegerLiteral   IntegerLiteral_value;
-		AST_Identifier       Identifier_value;
-		AST_Statement        Statement_value;
-		AST_Parentheses      Parentheses_value;
-		AST_FieldAccess      FieldAccess_value;
-		AST_VariableAssign   VariableAssign_value;
-		AST_VariableDecl     VariableDecl_value;
-		AST_TypeSimple       TypeSimple_value;
-		AST_Scope            Scope_value;
-		AST_IfStatement      IfStatement_value;
-		AST_StructDefinition StructDefinition_value;
-		AST_Root             Root_value;
+		AST_BinaryOp           BinaryOp_value;
+		AST_UnaryOp            UnaryOp_value;
+		AST_FunctionCall       FunctionCall_value;
+		AST_IntegerLiteral     IntegerLiteral_value;
+		AST_Identifier         Identifier_value;
+		AST_Statement          Statement_value;
+		AST_Parentheses        Parentheses_value;
+		AST_FieldAccess        FieldAccess_value;
+		AST_VariableAssign     VariableAssign_value;
+		AST_VariableDecl       VariableDecl_value;
+		AST_TypeSimple         TypeSimple_value;
+		AST_Scope              Scope_value;
+		AST_IfStatement        IfStatement_value;
+		AST_StructDefinition   StructDefinition_value;
+		AST_FunctionDefinition FunctionDefinition_value;
+		AST_ReturnStatement    ReturnStatement_value;
+		AST_Root               Root_value;
 	};
 
 	ASTIndex GetIndex();
 
 	~ASTNode() {
-
+		// TODO:
+		// Should probably have a proper destructor, since we have vectors and stuff...
 	}
 };
 
@@ -285,10 +293,8 @@ bool ParseUnaryOp(TokenStream* stream);
 bool ParseValue(TokenStream* stream);
 bool ParseFunctionCall(TokenStream* stream);
 bool ParseSingleValue(TokenStream* stream);
-bool ParseKeyword(TokenStream* stream);
 bool ParseIdentifier(TokenStream* stream);
 bool ParseStatement(TokenStream* stream);
-bool ParseFieldAccess(TokenStream* stream);
 bool ParseVariableAssign(TokenStream* stream);
 bool ParseVariableDecl(TokenStream* stream);
 bool ParseType(TokenStream* stream);
@@ -297,7 +303,9 @@ bool ParseArrayType(TokenStream* stream);
 bool ParsePointerType(TokenStream* stream);
 bool ParseScope(TokenStream* stream);
 bool ParseIfStatement(TokenStream* stream);
+bool ParseReturnStatement(TokenStream* stream);
 bool ParseStructDefinition(TokenStream* stream);
+bool ParseFunctionDefinition(TokenStream* stream);
 bool ParseTopLevelStatement(TokenStream* stream);
 
 bool CheckNextWord(TokenStream* stream, const char* str);

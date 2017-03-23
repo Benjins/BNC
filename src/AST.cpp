@@ -48,6 +48,9 @@ bool ParseTopLevelStatement(TokenStream* stream) {
 	if (ParseStructDefinition(stream)) {
 		FRAME_SUCCES();
 	}
+	else if (ParseFunctionDefinition(stream)) {
+		FRAME_SUCCES();
+	}
 	else if (ParseStatement(stream)) {
 		FRAME_SUCCES();
 	}
@@ -70,6 +73,9 @@ bool ParseStatement(TokenStream* stream) {
 	}
 	else if (ParseScope(stream)) {
 		needsSemicolon = false;
+	}
+	else if (ParseReturnStatement(stream)) {
+		// TODO: Should this require a semi-colon in the function, or back here?
 	}
 	else if (ParseValue(stream)) {
 
@@ -487,6 +493,23 @@ bool ParseIfStatement(TokenStream* stream) {
 	return false;
 }
 
+bool ParseReturnStatement(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+
+	if (ExpectAndEatWord(stream, "return")) {
+		if (ParseValue(stream)) {
+			ASTIndex valIdx = stream->ast->GetCurrIdx();
+			ASTNode* node = stream->ast->addNode();
+			node->type = ANT_ReturnStatement;
+			node->ReturnStatement_value.retVal = valIdx;
+
+			FRAME_SUCCES();
+		}
+	}
+
+	return false;
+}
+
 bool ParseStructDefinition(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
 
@@ -516,6 +539,72 @@ bool ParseStructDefinition(TokenStream* stream) {
 					node->StructDefinition_value.fieldDecls = fieldIndices;
 
 					FRAME_SUCCES();
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
+bool ParseFunctionDefinition(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+
+	if (ParseIdentifier(stream)) {
+		ASTIndex funcNameIdx = stream->ast->GetCurrIdx();
+		if (ExpectAndEatWord(stream, "::")) {
+			if (ExpectAndEatWord(stream, "(")) {
+				Vector<ASTIndex> parameters;
+				bool success = true;
+				while (true) {
+					if (parameters.count == 0) {
+						if (ParseVariableDecl(stream)) {
+							parameters.PushBack(stream->ast->GetCurrIdx());
+						}
+						else {
+							success = false;
+							break;
+						}
+					}
+					else if (ExpectAndEatWord(stream, ",")){
+						if (ParseVariableDecl(stream)) {
+							parameters.PushBack(stream->ast->GetCurrIdx());
+						}
+						else {
+							success = false;
+							break;
+						}
+					}
+					else if (CheckNextWord(stream, ")")) {
+						break;
+					}
+					else {
+						success = false;
+						break;
+					}
+				}
+
+				if (success) {
+					if (ExpectAndEatWord(stream, ")")) {
+						if (ExpectAndEatWord(stream, "->")) {
+							if (ParseType(stream)) {
+								ASTIndex retType = stream->ast->GetCurrIdx();
+
+								if (ParseScope(stream)) {
+									ASTIndex bodyScope = stream->ast->GetCurrIdx();
+
+									ASTNode* node = stream->ast->addNode();
+									node->type = ANT_FunctionDefinition;
+									node->FunctionDefinition_value.name = funcNameIdx;
+									node->FunctionDefinition_value.params = parameters;
+									node->FunctionDefinition_value.returnType = retType;
+									node->FunctionDefinition_value.bodyScope = bodyScope;
+
+									FRAME_SUCCES();
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -680,11 +769,50 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 		}
 	} break;
 
+	case ANT_FunctionDefinition: {
+		INDENT(indentation);
+		printf("Function:\n");
+		{
+			ASTNode* name = &node->ast->nodes.data[node->FunctionDefinition_value.name];
+			DisplayTree(name, indentation + 1);
+		}
+
+		INDENT(indentation);
+		printf("Parameters:\n");
+		for (int i = 0; i < node->FunctionDefinition_value.params.count; i++) {
+			ASTIndex paramIdx = node->FunctionDefinition_value.params.data[i];
+			ASTNode* param = &node->ast->nodes.data[paramIdx];
+			DisplayTree(param, indentation + 1);
+		}
+
+		INDENT(indentation);
+		printf("Returns:\n");
+		{
+			ASTNode* retType = &node->ast->nodes.data[node->FunctionDefinition_value.returnType];
+			DisplayTree(retType, indentation + 1);
+		}
+
+		INDENT(indentation);
+		printf("Body:\n");
+		{
+			ASTNode* body = &node->ast->nodes.data[node->FunctionDefinition_value.bodyScope];
+			DisplayTree(body, indentation + 1);
+		}
+
+	} break;
+
 	case ANT_Root: {
 		for (int i = 0; i < node->Root_value.topLevelStatements.count; i++) {
 			ASTNode* stmt = &node->ast->nodes.data[node->Root_value.topLevelStatements.data[i]];
 			DisplayTree(stmt, indentation);
 		}
+	} break;
+
+	case ANT_ReturnStatement: {
+		INDENT(indentation);
+		printf("Return:\n");
+		ASTNode* retVal = &node->ast->nodes.data[node->ReturnStatement_value.retVal];
+		DisplayTree(retVal, indentation + 1);
 	} break;
 
 	default: {
@@ -827,6 +955,11 @@ void FixUpOperators(ASTNode* node) {
 		FixUpOperators(val);
 	} break;
 
+	case ANT_VariableDecl: {
+		ASTNode* val = &node->ast->nodes.data[node->VariableDecl_value.initValue];
+		FixUpOperators(val);
+	} break;
+
 	case ANT_Scope: {
 		for (int i = 0; i < node->Scope_value.statements.count; i++) {
 			ASTIndex statementIdx = node->Scope_value.statements.data[i];
@@ -878,6 +1011,18 @@ void FixUpOperators(ASTNode* node) {
 
 	} break;
 
+	case ANT_FunctionDefinition: {
+		{
+			ASTNode* body = &node->ast->nodes.data[node->FunctionDefinition_value.bodyScope];
+			FixUpOperators(body);
+		}
+
+		for (int i = 0; i < node->FunctionDefinition_value.params.count; i++) {
+			ASTNode* param = &node->ast->nodes.data[node->FunctionDefinition_value.params.data[i]];
+			FixUpOperators(param);
+		}
+	} break;
+
 	case ANT_Root: {
 		for (int i = 0; i < node->Root_value.topLevelStatements.count; i++) {
 			ASTIndex stmtIdx = node->Root_value.topLevelStatements.data[i];
@@ -886,6 +1031,13 @@ void FixUpOperators(ASTNode* node) {
 			FixUpOperators(stmt);
 		}
 
+	} break;
+
+	case ANT_ReturnStatement: {
+		ASTIndex valIdx = node->ReturnStatement_value.retVal;
+		ASTNode* val = &node->ast->nodes.data[valIdx];
+
+		FixUpOperators(val);
 	} break;
 
 	default: {
