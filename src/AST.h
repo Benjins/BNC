@@ -338,8 +338,19 @@ const BinaryOperator binOpInfo[] = {
 	{ "*",  OA_Left, 5 },
 	{ "/",  OA_Left, 5 },
 	{ ".",  OA_Left, 2 },
-	{ "==", OA_Left, 9 }
+	{ "==", OA_Left, 9 },
+	{ "<=", OA_Left, 9 },
+	{ "<",  OA_Left, 9 },
+	{ ">=", OA_Left, 9 },
+	{ ".",  OA_Left, 9 },
 };
+
+
+const char* binaryOperators[] = {
+	"*", "-", "+", "/", ".", "==", "<=", "<", ">", ">="
+};
+
+static_assert(BNS_ARRAY_COUNT(binaryOperators) == BNS_ARRAY_COUNT(binOpInfo), "Binary operator info");
 
 const int unaryOpPrecedence = 3;
 

@@ -15,6 +15,11 @@ pow :: (b : int, e : int) -> int {
 
 nullary :: () -> void {
 	printf("gg\%s", "ssg");
+
+	x : int = 4;
+	if (x + 2 * 3 >= 4 * 2) {
+		printf("x is %d\n", x);
+	}
 }
 
 //Vector :: struct(T : Type) {

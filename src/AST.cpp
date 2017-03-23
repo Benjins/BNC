@@ -137,12 +137,6 @@ bool ParseIntLiteral(TokenStream* stream) {
 	return isValid;
 }
 
-const char* binaryOperators[] = {
-	"*", "-", "+", "/", ".", "=="
-};
-
-static_assert(BNS_ARRAY_COUNT(binaryOperators) == BNS_ARRAY_COUNT(binOpInfo), "Binary operator info");
-
 bool ParseBinaryOp(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
 	if (ParseSingleValue(stream)) {
