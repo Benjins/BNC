@@ -102,6 +102,20 @@ bool ParseStatement(TokenStream* stream) {
 	return false;
 }
 
+bool ParseStringLiteral(TokenStream* stream) {
+	const SubString& tok = stream->CurrTok();
+	if (*tok.start == '"') {
+		stream->index++;
+		ASTNode* node = stream->ast->addNode();
+		node->type = ANT_StringLiteral;
+		node->StringLiteral_value.repr = tok;
+
+		return true;
+	}
+
+	return false;
+}
+
 bool ParseIntLiteral(TokenStream* stream) {
 	const SubString& tok = stream->CurrTok();
 	bool isValid = true;
@@ -191,6 +205,9 @@ bool ParseValue(TokenStream* stream) {
 bool ParseSingleValue(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
 	if (ParseIntLiteral(stream)) {
+		FRAME_SUCCES();
+	}
+	if (ParseStringLiteral(stream)) {
 		FRAME_SUCCES();
 	}
 	else if (ExpectAndEatWord(stream, "(")) {
@@ -561,6 +578,9 @@ bool ParseFunctionDefinition(TokenStream* stream) {
 						if (ParseVariableDecl(stream)) {
 							parameters.PushBack(stream->ast->GetCurrIdx());
 						}
+						else if (CheckNextWord(stream, ")")) {
+							break;
+						}
 						else {
 							success = false;
 							break;
@@ -626,6 +646,11 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 	case ANT_IntegerLiteral: {
 		INDENT(indentation);
 		printf("Int lit: %d\n", node->IntegerLiteral_value.val);
+	} break;
+
+	case ANT_StringLiteral: {
+		INDENT(indentation);
+		printf("String lit:%.*s\n", BNS_LEN_START(node->StringLiteral_value.repr));
 	} break;
 
 	case ANT_Statement: {

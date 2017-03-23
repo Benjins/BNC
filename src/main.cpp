@@ -10,11 +10,10 @@ int main(int argc, char** argv){
 	
 	//printf("Yo.");
 
+	String code = ReadStringFromFile("test1.bnc");
+
 	AST ast;
-	ast.ConstructFromString(
-		"vec3 :: struct { x : float = 0; y : float = 0; z : float = 0; } "
-		"vec2 :: struct {x : float; y : float;}"
-		"pow :: (b : int, e : int = 2 * b + 1 * 4) -> int { return b * e; }");
+	ast.ConstructFromString(code);
 	//ast.ConstructFromString("{ v : Ter ;}");
 
 	//DisplayTree(&ast.nodes.Back());

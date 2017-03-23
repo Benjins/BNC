@@ -1,0 +1,22 @@
+vec3 :: struct {
+	x: float = 0;
+	y: float = 0;
+	z: float = 0;
+}
+
+vec2 :: struct {
+	x : float;
+	y : float;
+}
+
+pow :: (b : int, e : int) -> int {
+	return b * e;
+}
+
+nullary :: () -> void {
+	printf("gg\%s", "ssg");
+}
+
+//Vector :: struct(T : Type) {
+//	T val;
+//}

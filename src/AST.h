@@ -121,7 +121,6 @@ struct AST_FunctionCall{
 
 struct AST_StringLiteral {
 	SubString repr;
-	SubString val;
 };
 
 struct AST_IntegerLiteral {
@@ -179,6 +178,7 @@ struct ASTNode {
 		AST_UnaryOp            UnaryOp_value;
 		AST_FunctionCall       FunctionCall_value;
 		AST_IntegerLiteral     IntegerLiteral_value;
+		AST_StringLiteral      StringLiteral_value;
 		AST_Identifier         Identifier_value;
 		AST_Statement          Statement_value;
 		AST_Parentheses        Parentheses_value;
@@ -288,6 +288,7 @@ struct __PushPopFrame {
 
 bool ParseTokenStream(TokenStream* stream);
 bool ParseIntLiteral(TokenStream* stream);
+bool ParseStringLiteral(TokenStream* stream);
 bool ParseBinaryOp(TokenStream* stream);
 bool ParseUnaryOp(TokenStream* stream);
 bool ParseValue(TokenStream* stream);
