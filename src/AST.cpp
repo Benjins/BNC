@@ -19,12 +19,42 @@ void AST::ConstructFromTokens(const Vector<SubString>& toks) {
 	ParseTokenStream(&stream);
 }
 
-void ParseTokenStream(TokenStream* stream) {
+bool ParseTokenStream(TokenStream* stream) {
+	Vector<ASTIndex> topLevelStatements;
 	while (stream->index < stream->tokCount) {
-		if (!ParseStatement(stream)) {
+		if (!ParseTopLevelStatement(stream)) {
 			break;
 		}
+		else {
+			topLevelStatements.PushBack(stream->ast->GetCurrIdx());
+		}
 	}
+
+	if (stream->index == stream->tokCount) {
+		ASTNode* node = stream->ast->addNode();
+		node->type = ANT_Root;
+		node->Root_value.topLevelStatements = topLevelStatements;
+
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool ParseTopLevelStatement(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+
+	if (ParseStructDefinition(stream)) {
+		FRAME_SUCCES();
+	}
+	else if (ParseStatement(stream)) {
+		FRAME_SUCCES();
+	}
+	else {
+		return false;
+	}
+
 }
 
 bool ParseStatement(TokenStream* stream) {
@@ -354,12 +384,29 @@ bool ParseVariableDecl(TokenStream* stream) {
 			if (ParseType(stream)) {
 				ASTIndex typeIdx = stream->ast->GetCurrIdx();
 
-				ASTNode* node = stream->ast->addNode();
-				node->type = ANT_VariableDecl;
-				node->VariableDecl_value.varName = varIdx;
-				node->VariableDecl_value.type = typeIdx;
+				if (ExpectAndEatWord(stream, "=")) {
+					if (ParseValue(stream)) {
+						ASTIndex valIdx = stream->ast->GetCurrIdx();
 
-				FRAME_SUCCES();
+						ASTNode* node = stream->ast->addNode();
+						node->type = ANT_VariableDecl;
+						node->VariableDecl_value.varName = varIdx;
+						node->VariableDecl_value.type = typeIdx;
+						node->VariableDecl_value.initValue = valIdx;
+
+						FRAME_SUCCES();
+					}
+				}
+				else {
+
+					ASTNode* node = stream->ast->addNode();
+					node->type = ANT_VariableDecl;
+					node->VariableDecl_value.varName = varIdx;
+					node->VariableDecl_value.type = typeIdx;
+					node->VariableDecl_value.initValue = -1;
+
+					FRAME_SUCCES();
+				}
 			}
 		}
 	}
@@ -440,6 +487,43 @@ bool ParseIfStatement(TokenStream* stream) {
 	return false;
 }
 
+bool ParseStructDefinition(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+
+	if (ParseIdentifier(stream)) {
+		ASTIndex structNameIdx = stream->ast->GetCurrIdx();
+		Vector<ASTIndex> fieldIndices;
+		if (ExpectAndEatWord(stream, "::")) {
+			if (ExpectAndEatWord(stream, "struct")) {
+				if (ExpectAndEatWord(stream, "{")) {
+					while (true) {
+						if (ParseVariableDecl(stream)) {
+							if (ExpectAndEatWord(stream, ";")) {
+								fieldIndices.PushBack(stream->ast->GetCurrIdx());
+							}
+						}
+						else if (ExpectAndEatWord(stream, "}")) {
+							break;
+						}
+						else {
+							return false;
+						}
+					}
+
+					ASTNode* node = stream->ast->addNode();
+					node->type = ANT_StructDefinition;
+					node->StructDefinition_value.structName = structNameIdx;
+					node->StructDefinition_value.fieldDecls = fieldIndices;
+
+					FRAME_SUCCES();
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
 void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 #define INDENT(x) for (int i = 0; i < x; i++) {printf("    ");}
 	switch (node->type) {
@@ -510,6 +594,14 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 
 		ASTNode* type = &node->ast->nodes.data[node->VariableDecl_value.type];
 		DisplayTree(type, indentation + 1);
+
+		if (node->VariableDecl_value.initValue != -1) {
+			ASTNode* initVal = &node->ast->nodes.data[node->VariableDecl_value.initValue];
+
+			INDENT(indentation);
+			printf("Initial Value:\n");
+			DisplayTree(initVal, indentation + 1);
+		}
 	} break;
 
 	case ANT_FieldAccess: {
@@ -570,6 +662,29 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 		ASTNode* type = &node->ast->nodes.data[node->TypeSimple_value.name];
 		INDENT(indentation);
 		printf("Type '%.*s'\n", BNS_LEN_START(type->Identifier_value.name));
+	} break;
+
+	case ANT_StructDefinition: {
+		{
+			ASTNode* name = &node->ast->nodes.data[node->StructDefinition_value.structName];
+			INDENT(indentation);
+			printf("Struct:\n");
+			DisplayTree(name, indentation + 1);
+		}
+
+		INDENT(indentation);
+		printf("Fields:\n");
+		for (int i = 0; i < node->StructDefinition_value.fieldDecls.count; i++) {
+			ASTNode* field = &node->ast->nodes.data[node->StructDefinition_value.fieldDecls.data[i]];
+			DisplayTree(field, indentation + 1);
+		}
+	} break;
+
+	case ANT_Root: {
+		for (int i = 0; i < node->Root_value.topLevelStatements.count; i++) {
+			ASTNode* stmt = &node->ast->nodes.data[node->Root_value.topLevelStatements.data[i]];
+			DisplayTree(stmt, indentation);
+		}
 	} break;
 
 	default: {
@@ -744,6 +859,33 @@ void FixUpOperators(ASTNode* node) {
 
 			FixUpOperators(body);
 		}
+	} break;
+
+	case ANT_StructDefinition: {
+		{
+			ASTIndex nameIdx = node->StructDefinition_value.structName;
+			ASTNode* name = &node->ast->nodes.data[nameIdx];
+
+			FixUpOperators(name);
+		}
+
+		for (int i = 0; i < node->StructDefinition_value.fieldDecls.count; i++) {
+			ASTIndex fieldIdx = node->StructDefinition_value.fieldDecls.data[i];
+			ASTNode* field = &node->ast->nodes.data[fieldIdx];
+
+			FixUpOperators(field);
+		}
+
+	} break;
+
+	case ANT_Root: {
+		for (int i = 0; i < node->Root_value.topLevelStatements.count; i++) {
+			ASTIndex stmtIdx = node->Root_value.topLevelStatements.data[i];
+			ASTNode* stmt = &node->ast->nodes.data[stmtIdx];
+
+			FixUpOperators(stmt);
+		}
+
 	} break;
 
 	default: {

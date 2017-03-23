@@ -9,7 +9,7 @@
 enum ASTNodeType {
 	ANT_Invalid = -1,
 	ANT_StructField,
-	ANT_StructDef,
+	ANT_StructDefinition,
 	ANT_FunctionDef,
 	ANT_Parameter,
 	ANT_VariableDecl,
@@ -31,21 +31,14 @@ enum ASTNodeType {
 	ANT_UnaryOp,
 	ANT_BinaryOp,
 	ANT_Parentheses,
+	ANT_Root,
 	ANT_Count
 };
 
 typedef int ASTIndex;
 
-struct AST_StructField{
-	ASTIndex def;
-};
-
-struct AST_StructDef {
-	SubString name;
-};
-
 struct AST_FunctionDef {
-	SubString name;
+	ASTIndex name;
 	Vector<ASTIndex> params;
 	ASTIndex returnType;
 	Vector<ASTIndex> bodyStatements;
@@ -59,6 +52,7 @@ struct ANT_Parameter {
 struct AST_VariableDecl {
 	ASTIndex type;
 	ASTIndex varName;
+	ASTIndex initValue;
 };
 
 struct AST_VariableAssign {
@@ -150,6 +144,15 @@ struct AST_Parentheses {
 	ASTIndex val;
 };
 
+struct AST_StructDefinition {
+	ASTIndex structName;
+	Vector<ASTIndex> fieldDecls;
+};
+
+struct AST_Root {
+	Vector<ASTIndex> topLevelStatements;
+};
+
 struct AST;
 
 struct ASTNode {
@@ -167,19 +170,21 @@ struct ASTNode {
 	}
 
 	union {
-		AST_BinaryOp       BinaryOp_value;
-		AST_UnaryOp        UnaryOp_value;
-		AST_FunctionCall   FunctionCall_value;
-		AST_IntegerLiteral IntegerLiteral_value;
-		AST_Identifier     Identifier_value;
-		AST_Statement      Statement_value;
-		AST_Parentheses    Parentheses_value;
-		AST_FieldAccess    FieldAccess_value;
-		AST_VariableAssign VariableAssign_value;
-		AST_VariableDecl   VariableDecl_value;
-		AST_TypeSimple     TypeSimple_value;
-		AST_Scope          Scope_value;
-		AST_IfStatement    IfStatement_value;
+		AST_BinaryOp         BinaryOp_value;
+		AST_UnaryOp          UnaryOp_value;
+		AST_FunctionCall     FunctionCall_value;
+		AST_IntegerLiteral   IntegerLiteral_value;
+		AST_Identifier       Identifier_value;
+		AST_Statement        Statement_value;
+		AST_Parentheses      Parentheses_value;
+		AST_FieldAccess      FieldAccess_value;
+		AST_VariableAssign   VariableAssign_value;
+		AST_VariableDecl     VariableDecl_value;
+		AST_TypeSimple       TypeSimple_value;
+		AST_Scope            Scope_value;
+		AST_IfStatement      IfStatement_value;
+		AST_StructDefinition StructDefinition_value;
+		AST_Root             Root_value;
 	};
 
 	ASTIndex GetIndex();
@@ -273,7 +278,7 @@ struct __PushPopFrame {
 #define PUSH_STREAM_FRAME(stream) __PushPopFrame _frame_stream(stream)
 #define FRAME_SUCCES() _frame_stream.success = true; return true
 
-void ParseTokenStream(TokenStream* stream);
+bool ParseTokenStream(TokenStream* stream);
 bool ParseIntLiteral(TokenStream* stream);
 bool ParseBinaryOp(TokenStream* stream);
 bool ParseUnaryOp(TokenStream* stream);
@@ -292,6 +297,8 @@ bool ParseArrayType(TokenStream* stream);
 bool ParsePointerType(TokenStream* stream);
 bool ParseScope(TokenStream* stream);
 bool ParseIfStatement(TokenStream* stream);
+bool ParseStructDefinition(TokenStream* stream);
+bool ParseTopLevelStatement(TokenStream* stream);
 
 bool CheckNextWord(TokenStream* stream, const char* str);
 bool ExpectAndEatWord(TokenStream* stream, const char* str);

@@ -11,7 +11,7 @@ int main(int argc, char** argv){
 	//printf("Yo.");
 
 	AST ast;
-	ast.ConstructFromString("{ 1 + a.b * c.d == 4 ; if 1 == 2 { print (5 * 6 + 7 * 8 == a * 5 + b * 6 + 3) ; } }");
+	ast.ConstructFromString(" vec3 :: struct { x : float = 0; y : float = 0; z : float = 0; } vec2 :: struct {x : float; y : float;}");
 	//ast.ConstructFromString("{ v : Ter ;}");
 
 	//DisplayTree(&ast.nodes.Back());
