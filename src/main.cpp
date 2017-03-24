@@ -18,10 +18,12 @@ int main(int argc, char** argv){
 
 	//DisplayTree(&ast.nodes.Back());
 
-	//printf("\n\n---Fixing up ops---\n\n");
+	DisplayTree(&ast.nodes.Back());
+
+	printf("\n\n---Fixing up ops---\n\n");
 
 	FixUpOperators(&ast.nodes.Back());
-
+	printf("\n");
 	DisplayTree(&ast.nodes.Back());
 	
 	return 0;

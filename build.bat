@@ -1,1 +1,1 @@
-cl /Zi /Od src/main.cpp /FeBNC.exe /Fobuild
+cl /Zi /Od /DBNS_DEBUG src/main.cpp /FeBNC.exe /Fobuild

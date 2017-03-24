@@ -11,9 +11,15 @@ vec2 :: struct {
 }
 */
 
+/*
 pow :: (b : int, e : int) -> int {
 	return -b.xc * e;
 }
+*/
+
+p(-b.xc * e);
+
+Fall(-c.vv * e + 3 * 2 + x.cv);
 
 /*
 nullary :: () -> void {

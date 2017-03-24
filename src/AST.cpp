@@ -884,8 +884,15 @@ void SwapBinaryOperators(ASTNode* parent, ASTNode* child) {
 
 	ASTIndex childIdx = child->GetIndex();
 	if (parent->BinaryOp_value.left == childIdx) {
-		// Actually, not sure if this happens?
-		ASSERT(false);
+		{
+			AST_BinaryOp tmp = parent->BinaryOp_value;
+			parent->BinaryOp_value = child->BinaryOp_value;
+			child->BinaryOp_value = tmp;
+		}
+
+		ASTIndex parentRight = parent->BinaryOp_value.right;
+		parent->BinaryOp_value.right = child->GetIndex();
+		child->BinaryOp_value.left = parentRight;
 	}
 	else if (parent->BinaryOp_value.right == childIdx) {
 		{
@@ -903,11 +910,11 @@ void SwapBinaryOperators(ASTNode* parent, ASTNode* child) {
 	}
 }
 
-void FixUpOperators(ASTNode* node) {
+void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 	switch (node->type) {
 	case ANT_BinaryOp: {
-		//printf("Before:\n");
-		//DisplayTree(node);
+		printf("Before:\n");
+		DisplayTree(root);
 		ASTNode* left = &node->ast->nodes.data[node->BinaryOp_value.left];
 		ASTNode* right = &node->ast->nodes.data[node->BinaryOp_value.right];
 
@@ -920,11 +927,10 @@ void FixUpOperators(ASTNode* node) {
 			const BinaryOperator* leftInfo = GetBinaryInfoForOp(left->BinaryOp_value.op);
 			if (opInfo->precedence < leftInfo->precedence) {
 				SwapBinaryOperators(node, left);
-				printf("Swap node w/ left.\n");
-				FixUpOperators(node);
+				FixUpOperators(node, root);
 			}
 			else {
-				FixUpOperators(left);
+				FixUpOperators(left, root);
 			}
 		}
 		else if (left->type == ANT_UnaryOp) {
@@ -940,26 +946,39 @@ void FixUpOperators(ASTNode* node) {
 				left->type = ANT_BinaryOp;
 
 				node = left;
+				opInfo = GetBinaryInfoForOp(node->BinaryOp_value.op);
 			}
 		}
+
+		printf("\n1\n");
+		DisplayTree(root);
+		printf("\n");
 
 		if (right->type == ANT_BinaryOp) {
 			// If the precedence is higher, or its equal and left-assoc (so most)
 			const BinaryOperator* rightInfo = GetBinaryInfoForOp(right->BinaryOp_value.op);
 			if (opInfo->precedence < rightInfo->precedence) {
-				ASTIndex oldNodeIdx = node - node->ast->nodes.data;
+				ASTIndex oldNodeIdx = idx;
 				SwapBinaryOperators(node, right);
-				ASTIndex oldLeft = node->BinaryOp_value.left;
-				FixUpOperators(node);
+				ASTNode* oldNode = &node->ast->nodes.data[oldNodeIdx];
+				FixUpOperators(oldNode, root);
 			}
 			else if (opInfo->precedence == rightInfo->precedence && opInfo->assoc == OA_Left) {
 				SwapBinaryOperators(node, right);
-				FixUpOperators(node);
+				FixUpOperators(node, root);
 			}
 			else {
-				FixUpOperators(right);
+				FixUpOperators(right, root);
 			}
 		}
+
+
+		/*
+		printf("\n2\n");
+		DisplayTree(root);
+		printf("\n");
+
+		opInfo = GetBinaryInfoForOp(node->BinaryOp_value.op);
 
 		if (right->type == ANT_BinaryOp) {
 			// If the precedence is higher, or its equal and left-assoc (so most)
@@ -971,39 +990,69 @@ void FixUpOperators(ASTNode* node) {
 				SwapBinaryOperators(node, right);
 			}
 		}
+		*/
 
-		//printf("After:\n");
-		//DisplayTree(node);
+		printf("After:\n");
+		DisplayTree(root);
 	} break;
 
 	case ANT_Statement: {
-		ASTNode* root = &node->ast->nodes.data[node->Statement_value.root];
-		FixUpOperators(root);
+		ASTNode* rootNode = &node->ast->nodes.data[node->Statement_value.root];
+		FixUpOperators(rootNode, root);
 	} break;
 
 	case ANT_Parentheses: {
 		ASTNode* val = &node->ast->nodes.data[node->Parentheses_value.val];
-		FixUpOperators(val);
+		FixUpOperators(val, root);
 	} break;
 
 	case ANT_UnaryOp: {
 		ASTNode* val = &node->ast->nodes.data[node->UnaryOp_value.val];
-		FixUpOperators(val);
+
+		bool didFixup = false;
+		if (node->UnaryOp_value.isPre && val->type == ANT_BinaryOp) {
+			const BinaryOperator* opInfo = GetBinaryInfoForOp(val->BinaryOp_value.op);
+			if (opInfo->precedence > unaryOpPrecedence) {
+				ASTIndex oldNode  = node->GetIndex();
+				ASTIndex oldVal   = val->GetIndex();
+				ASTIndex oldLeft = val->BinaryOp_value.left;
+				ASTIndex oldRight = val->BinaryOp_value.right;
+				const char* oldUnOp  = node->UnaryOp_value.op;
+				const char* oldBinOp = val->BinaryOp_value.op;
+
+				node->type = ANT_BinaryOp;
+				node->BinaryOp_value.left = oldVal;
+				node->BinaryOp_value.right = oldRight;
+				node->BinaryOp_value.op = oldBinOp;
+				val->type = ANT_UnaryOp;
+				val->UnaryOp_value.isPre = true;
+				val->UnaryOp_value.op = oldUnOp;
+				val->UnaryOp_value.val = oldLeft;
+
+				didFixup = true;
+
+				FixUpOperators(node, root);
+			}
+		}
+
+		if (!didFixup) {
+			FixUpOperators(val, root);
+		}
 	} break;
 
 	case ANT_FieldAccess: {
 		ASTNode* val = &node->ast->nodes.data[node->FieldAccess_value.val];
-		FixUpOperators(val);
+		FixUpOperators(val, root);
 	} break;
 
 	case ANT_VariableAssign: {
 		ASTNode* val = &node->ast->nodes.data[node->VariableAssign_value.val];
-		FixUpOperators(val);
+		FixUpOperators(val, root);
 	} break;
 
 	case ANT_VariableDecl: {
 		ASTNode* val = &node->ast->nodes.data[node->VariableDecl_value.initValue];
-		FixUpOperators(val);
+		FixUpOperators(val, root);
 	} break;
 
 	case ANT_Scope: {
@@ -1011,7 +1060,7 @@ void FixUpOperators(ASTNode* node) {
 			ASTIndex statementIdx = node->Scope_value.statements.data[i];
 			ASTNode* stmt = &node->ast->nodes.data[statementIdx];
 
-			FixUpOperators(stmt);
+			FixUpOperators(stmt, root);
 		}
 	} break;
 
@@ -1020,7 +1069,7 @@ void FixUpOperators(ASTNode* node) {
 			ASTIndex argIdx = node->FunctionCall_value.args.data[i];
 			ASTNode* arg = &node->ast->nodes.data[argIdx];
 
-			FixUpOperators(arg);
+			FixUpOperators(arg, root);
 		}
 	} break;
 
@@ -1029,14 +1078,14 @@ void FixUpOperators(ASTNode* node) {
 			ASTIndex condIndex = node->IfStatement_value.condition;
 			ASTNode* cond = &node->ast->nodes.data[condIndex];
 
-			FixUpOperators(cond);
+			FixUpOperators(cond, root);
 		}
 
 		{
 			ASTIndex bodyIndex = node->IfStatement_value.bodyScope;
 			ASTNode* body = &node->ast->nodes.data[bodyIndex];
 
-			FixUpOperators(body);
+			FixUpOperators(body, root);
 		}
 	} break;
 
@@ -1045,14 +1094,14 @@ void FixUpOperators(ASTNode* node) {
 			ASTIndex nameIdx = node->StructDefinition_value.structName;
 			ASTNode* name = &node->ast->nodes.data[nameIdx];
 
-			FixUpOperators(name);
+			FixUpOperators(name, root);
 		}
 
 		for (int i = 0; i < node->StructDefinition_value.fieldDecls.count; i++) {
 			ASTIndex fieldIdx = node->StructDefinition_value.fieldDecls.data[i];
 			ASTNode* field = &node->ast->nodes.data[fieldIdx];
 
-			FixUpOperators(field);
+			FixUpOperators(field, root);
 		}
 
 	} break;
@@ -1060,12 +1109,12 @@ void FixUpOperators(ASTNode* node) {
 	case ANT_FunctionDefinition: {
 		{
 			ASTNode* body = &node->ast->nodes.data[node->FunctionDefinition_value.bodyScope];
-			FixUpOperators(body);
+			FixUpOperators(body, root);
 		}
 
 		for (int i = 0; i < node->FunctionDefinition_value.params.count; i++) {
 			ASTNode* param = &node->ast->nodes.data[node->FunctionDefinition_value.params.data[i]];
-			FixUpOperators(param);
+			FixUpOperators(param, root);
 		}
 	} break;
 
@@ -1074,7 +1123,7 @@ void FixUpOperators(ASTNode* node) {
 			ASTIndex stmtIdx = node->Root_value.topLevelStatements.data[i];
 			ASTNode* stmt = &node->ast->nodes.data[stmtIdx];
 
-			FixUpOperators(stmt);
+			FixUpOperators(stmt, node);
 		}
 
 	} break;
@@ -1083,7 +1132,7 @@ void FixUpOperators(ASTNode* node) {
 		ASTIndex valIdx = node->ReturnStatement_value.retVal;
 		ASTNode* val = &node->ast->nodes.data[valIdx];
 
-		FixUpOperators(val);
+		FixUpOperators(val, root);
 	} break;
 
 	default: {
