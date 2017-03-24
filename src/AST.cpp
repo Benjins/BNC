@@ -201,8 +201,7 @@ bool ParseUnaryOp(TokenStream* stream) {
 			}
 		}
 	}
-	/*
-	else if (ParseSingleValue(stream)) {
+	else if (ParseSingleValueNoUnary(stream)) {
 		ASTIndex val = stream->ast->GetCurrIdx();
 		if (ExpectAndEatOneOfWords(stream, unaryOperators, BNS_ARRAY_COUNT(unaryOperators), &opIdx)) {
 			if (const UnaryOperator* op = GetUnaryInfoForOp(unaryOperators[opIdx])) {
@@ -216,7 +215,7 @@ bool ParseUnaryOp(TokenStream* stream) {
 				}
 			}
 		}
-	}*/
+	}
 
 	return false;
 }
@@ -233,7 +232,7 @@ bool ParseValue(TokenStream* stream) {
 	return false;
 }
 
-bool ParseSingleValue(TokenStream* stream) {
+bool ParseSingleValueCommon(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
 	if (ParseIntLiteral(stream)) {
 		FRAME_SUCCES();
@@ -253,6 +252,30 @@ bool ParseSingleValue(TokenStream* stream) {
 				FRAME_SUCCES();
 			}
 		}
+	}
+
+	return false;
+}
+
+bool ParseSingleValueNoUnary(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+	if (ParseSingleValueCommon(stream)) {
+		FRAME_SUCCES();
+	}
+	else if (ParseFunctionCall(stream)) {
+		FRAME_SUCCES();
+	}
+	else if (ParseIdentifier(stream)) {
+		FRAME_SUCCES();
+	}
+
+	return false;
+}
+
+bool ParseSingleValue(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+	if (ParseSingleValueCommon(stream)) {
+		FRAME_SUCCES();
 	}
 	else if (ParseUnaryOp(stream)) {
 		FRAME_SUCCES();
@@ -913,8 +936,6 @@ void SwapBinaryOperators(ASTNode* parent, ASTNode* child) {
 void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 	switch (node->type) {
 	case ANT_BinaryOp: {
-		printf("Before:\n");
-		DisplayTree(root);
 		ASTNode* left = &node->ast->nodes.data[node->BinaryOp_value.left];
 		ASTNode* right = &node->ast->nodes.data[node->BinaryOp_value.right];
 
@@ -950,10 +971,6 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 			}
 		}
 
-		printf("\n1\n");
-		DisplayTree(root);
-		printf("\n");
-
 		if (right->type == ANT_BinaryOp) {
 			// If the precedence is higher, or its equal and left-assoc (so most)
 			const BinaryOperator* rightInfo = GetBinaryInfoForOp(right->BinaryOp_value.op);
@@ -971,29 +988,6 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 				FixUpOperators(right, root);
 			}
 		}
-
-
-		/*
-		printf("\n2\n");
-		DisplayTree(root);
-		printf("\n");
-
-		opInfo = GetBinaryInfoForOp(node->BinaryOp_value.op);
-
-		if (right->type == ANT_BinaryOp) {
-			// If the precedence is higher, or its equal and left-assoc (so most)
-			const BinaryOperator* rightInfo = GetBinaryInfoForOp(right->BinaryOp_value.op);
-			if (opInfo->precedence < rightInfo->precedence) {
-				SwapBinaryOperators(node, right);
-			}
-			else if (opInfo->precedence == rightInfo->precedence && opInfo->assoc == OA_Left) {
-				SwapBinaryOperators(node, right);
-			}
-		}
-		*/
-
-		printf("After:\n");
-		DisplayTree(root);
 	} break;
 
 	case ANT_Statement: {

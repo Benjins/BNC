@@ -17,9 +17,11 @@ pow :: (b : int, e : int) -> int {
 }
 */
 
-p(-b.xc * e);
+//p(-b.xc * e);
 
-Fall(-c.vv * e + 3 * 2 + x.cv);
+p(-b^ * 34);
+
+//Fall(-c.vv * e + 3 * 2 + x.cv);
 
 /*
 nullary :: () -> void {

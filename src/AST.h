@@ -295,6 +295,7 @@ bool ParseUnaryOp(TokenStream* stream);
 bool ParseValue(TokenStream* stream);
 bool ParseFunctionCall(TokenStream* stream);
 bool ParseSingleValue(TokenStream* stream);
+bool ParseSingleValueNoUnary(TokenStream* stream);
 bool ParseIdentifier(TokenStream* stream);
 bool ParseStatement(TokenStream* stream);
 bool ParseVariableAssign(TokenStream* stream);
