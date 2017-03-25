@@ -220,12 +220,24 @@ bool ParseUnaryOp(TokenStream* stream) {
 	return false;
 }
 
-bool ParseValue(TokenStream* stream) {
+bool ParseNonArrValue(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
 	if (ParseBinaryOp(stream)) {
 		FRAME_SUCCES();
 	}
 	else if (ParseSingleValue(stream)) {
+		FRAME_SUCCES();
+	}
+
+	return false;
+}
+
+bool ParseValue(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+	if (ParseArrayAccess(stream)) {
+		FRAME_SUCCES();
+	}
+	else if (ParseNonArrValue(stream)) {
 		FRAME_SUCCES();
 	}
 
@@ -285,6 +297,29 @@ bool ParseSingleValue(TokenStream* stream) {
 	}
 	else if (ParseIdentifier(stream)) {
 		FRAME_SUCCES();
+	}
+
+	return false;
+}
+
+bool ParseArrayAccess(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+	if (ParseNonArrValue(stream)) {
+		ASTIndex arr = stream->ast->GetCurrIdx();
+		if (ExpectAndEatWord(stream, "[")) {
+			if (ParseValue(stream)) {
+				ASTIndex index = stream->ast->GetCurrIdx();
+				if (ExpectAndEatWord(stream, "]")) {
+
+					ASTNode* node = stream->ast->addNode();
+					node->type = ANT_ArrayAccess;
+					node->ArrayAccess_value.arr = arr;
+					node->ArrayAccess_value.index = index;
+
+					FRAME_SUCCES();
+				}
+			}
+		}
 	}
 
 	return false;
@@ -357,7 +392,7 @@ bool ParseFunctionCall(TokenStream* stream) {
 		else {
 			// We got a var or something
 			// TODO: Other checks to make?
-			FRAME_SUCCES();
+			return false;
 		}
 	}
 
@@ -785,6 +820,22 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 		DisplayTree(val, indentation + 1);
 	} break;
 
+	case ANT_ArrayAccess: {
+		ASTNode* arr = &node->ast->nodes.data[node->ArrayAccess_value.arr];
+		ASTNode* idx = &node->ast->nodes.data[node->ArrayAccess_value.index];
+
+		INDENT(indentation);
+		printf("Array access:\n");
+
+		INDENT(indentation);
+		printf("Array:\n");
+		DisplayTree(arr, indentation + 1);
+
+		INDENT(indentation);
+		printf("Index:\n");
+		DisplayTree(idx, indentation + 1);
+	} break;
+
 	case ANT_Identifier: {
 		INDENT(indentation);
 		printf("Identifier '%.*s'\n", BNS_LEN_START(node->Identifier_value.name));
@@ -1064,6 +1115,18 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 	case ANT_FieldAccess: {
 		ASTNode* val = &node->ast->nodes.data[node->FieldAccess_value.val];
 		FixUpOperators(val, root);
+	} break;
+
+	case ANT_ArrayAccess: {
+		{
+			ASTNode* arr = &node->ast->nodes.data[node->ArrayAccess_value.arr];
+			FixUpOperators(arr, root);
+		}
+
+		{
+			ASTNode* idx = &node->ast->nodes.data[node->ArrayAccess_value.index];
+			FixUpOperators(idx, root);
+		}
 	} break;
 
 	case ANT_VariableAssign: {

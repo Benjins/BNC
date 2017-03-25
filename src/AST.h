@@ -192,6 +192,7 @@ struct ASTNode {
 		AST_StructDefinition   StructDefinition_value;
 		AST_FunctionDefinition FunctionDefinition_value;
 		AST_ReturnStatement    ReturnStatement_value;
+		AST_ArrayAccess        ArrayAccess_value;
 		AST_Root               Root_value;
 	};
 
@@ -310,6 +311,7 @@ bool ParseReturnStatement(TokenStream* stream);
 bool ParseStructDefinition(TokenStream* stream);
 bool ParseFunctionDefinition(TokenStream* stream);
 bool ParseTopLevelStatement(TokenStream* stream);
+bool ParseArrayAccess(TokenStream* stream);
 
 bool CheckNextWord(TokenStream* stream, const char* str);
 bool ExpectAndEatWord(TokenStream* stream, const char* str);
