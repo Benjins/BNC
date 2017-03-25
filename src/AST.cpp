@@ -939,9 +939,14 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 		ASTNode* left = &node->ast->nodes.data[node->BinaryOp_value.left];
 		ASTNode* right = &node->ast->nodes.data[node->BinaryOp_value.right];
 
+		FixUpOperators(left);
+		FixUpOperators(right);
+
 		const BinaryOperator* opInfo = GetBinaryInfoForOp(node->BinaryOp_value.op);
 
 		int idx = node->GetIndex();
+
+		bool didFixup = false;
 
 		if (left->type == ANT_BinaryOp) {
 			// If the precedence is higher
@@ -949,12 +954,13 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 			if (opInfo->precedence < leftInfo->precedence) {
 				SwapBinaryOperators(node, left);
 				FixUpOperators(node, root);
+				didFixup = true;
 			}
 			else {
 				FixUpOperators(left, root);
 			}
 		}
-		else if (left->type == ANT_UnaryOp) {
+		else if (left->type == ANT_UnaryOp && left->UnaryOp_value.isPre) {
 			if (opInfo->precedence < unaryOpPrecedence) {
 				AST_BinaryOp tmp = node->BinaryOp_value;
 				node->UnaryOp_value = left->UnaryOp_value;
@@ -966,8 +972,12 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 				node->type = ANT_UnaryOp;
 				left->type = ANT_BinaryOp;
 
+				FixUpOperators(left, root);
+				didFixup = true;
+
 				node = left;
 				opInfo = GetBinaryInfoForOp(node->BinaryOp_value.op);
+
 			}
 		}
 
@@ -983,10 +993,33 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 			else if (opInfo->precedence == rightInfo->precedence && opInfo->assoc == OA_Left) {
 				SwapBinaryOperators(node, right);
 				FixUpOperators(node, root);
+				didFixup = true;
 			}
 			else {
 				FixUpOperators(right, root);
 			}
+		}
+		else if (right->type == ANT_UnaryOp && !right->UnaryOp_value.isPre) {
+			if (opInfo->precedence < unaryOpPrecedence) {
+
+				AST_BinaryOp tmp = node->BinaryOp_value;
+				node->UnaryOp_value = right->UnaryOp_value;
+				right->BinaryOp_value = tmp;
+
+				right->BinaryOp_value.right = node->UnaryOp_value.val;
+				node->UnaryOp_value.val = right->GetIndex();
+
+				node->type = ANT_UnaryOp;
+				right->type = ANT_BinaryOp;
+
+				FixUpOperators(right, root);
+				didFixup = true;
+
+				node = right;
+			}
+		}
+		if (didFixup) {
+			FixUpOperators(&node->ast->nodes.data[idx], root);
 		}
 	} break;
 

@@ -18,8 +18,7 @@ pow :: (b : int, e : int) -> int {
 */
 
 //p(-b.xc * e);
-
-p(-b^ * 34);
+p(-b.cc^*34 + er.c*t.x^);
 
 //Fall(-c.vv * e + 3 * 2 + x.cv);
 
