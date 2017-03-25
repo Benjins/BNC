@@ -972,12 +972,9 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 				node->type = ANT_UnaryOp;
 				left->type = ANT_BinaryOp;
 
-				FixUpOperators(left, root);
 				didFixup = true;
-
 				node = left;
 				opInfo = GetBinaryInfoForOp(node->BinaryOp_value.op);
-
 			}
 		}
 
@@ -1011,10 +1008,7 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 
 				node->type = ANT_UnaryOp;
 				right->type = ANT_BinaryOp;
-
-				FixUpOperators(right, root);
 				didFixup = true;
-
 				node = right;
 			}
 		}
