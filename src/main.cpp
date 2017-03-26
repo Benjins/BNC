@@ -7,16 +7,10 @@
 #include "../CppUtils/lexer.cpp"
 
 int main(int argc, char** argv){
-	
-	//printf("Yo.");
-
 	String code = ReadStringFromFile("test1.bnc");
 
 	AST ast;
 	ast.ConstructFromString(code);
-	//ast.ConstructFromString("{ v : Ter ;}");
-
-	//DisplayTree(&ast.nodes.Back());
 
 	DisplayTree(&ast.nodes.Back());
 
