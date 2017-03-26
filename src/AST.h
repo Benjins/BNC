@@ -381,6 +381,7 @@ static_assert(BNS_ARRAY_COUNT(binaryOperators) == BNS_ARRAY_COUNT(binOpInfo), "B
 static_assert(BNS_ARRAY_COUNT(unaryOperators)  == BNS_ARRAY_COUNT(unOpInfo),  "Unary  operator info");
 
 const int unaryOpPrecedence = 3;
+const int arrayOpPrecedence = 2;
 
 void DisplayTree(ASTNode* node, int indentation = 0);
 

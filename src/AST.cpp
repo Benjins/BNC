@@ -220,7 +220,7 @@ bool ParseUnaryOp(TokenStream* stream) {
 	return false;
 }
 
-bool ParseNonArrValue(TokenStream* stream) {
+bool ParseValue(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
 	if (ParseBinaryOp(stream)) {
 		FRAME_SUCCES();
@@ -232,27 +232,9 @@ bool ParseNonArrValue(TokenStream* stream) {
 	return false;
 }
 
-bool ParseValue(TokenStream* stream) {
+bool ParseParenthesesValue(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
-	if (ParseArrayAccess(stream)) {
-		FRAME_SUCCES();
-	}
-	else if (ParseNonArrValue(stream)) {
-		FRAME_SUCCES();
-	}
-
-	return false;
-}
-
-bool ParseSingleValueCommon(TokenStream* stream) {
-	PUSH_STREAM_FRAME(stream);
-	if (ParseIntLiteral(stream)) {
-		FRAME_SUCCES();
-	}
-	if (ParseStringLiteral(stream)) {
-		FRAME_SUCCES();
-	}
-	else if (ExpectAndEatWord(stream, "(")) {
+	if (ExpectAndEatWord(stream, "(")) {
 		if (ParseValue(stream)) {
 			if (ExpectAndEatWord(stream, ")")) {
 				ASTIndex idx = stream->ast->GetCurrIdx();
@@ -264,6 +246,24 @@ bool ParseSingleValueCommon(TokenStream* stream) {
 				FRAME_SUCCES();
 			}
 		}
+	}
+
+	return false;
+}
+
+bool ParseSingleValueCommon(TokenStream* stream) {
+	PUSH_STREAM_FRAME(stream);
+	if (ParseIntLiteral(stream)) {
+		FRAME_SUCCES();
+	}
+	else if (ParseStringLiteral(stream)) {
+		FRAME_SUCCES();
+	}
+	else if (ParseArrayAccess(stream)) {
+		FRAME_SUCCES();
+	}
+	else if (ParseParenthesesValue(stream)){
+		FRAME_SUCCES();
 	}
 
 	return false;
@@ -304,7 +304,7 @@ bool ParseSingleValue(TokenStream* stream) {
 
 bool ParseArrayAccess(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
-	if (ParseNonArrValue(stream)) {
+	if (ParseIdentifier(stream) || ParseParenthesesValue(stream)) {
 		ASTIndex arr = stream->ast->GetCurrIdx();
 		if (ExpectAndEatWord(stream, "[")) {
 			if (ParseValue(stream)) {
@@ -1049,7 +1049,6 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 		}
 		else if (right->type == ANT_UnaryOp && !right->UnaryOp_value.isPre) {
 			if (opInfo->precedence < unaryOpPrecedence) {
-
 				AST_BinaryOp tmp = node->BinaryOp_value;
 				node->UnaryOp_value = right->UnaryOp_value;
 				right->BinaryOp_value = tmp;
@@ -1063,8 +1062,28 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 				node = right;
 			}
 		}
+		else if (right->type == ANT_ArrayAccess) {
+			if (opInfo->precedence <= arrayOpPrecedence) {
+				AST_BinaryOp nodeTmp = node->BinaryOp_value;
+				AST_ArrayAccess rightTmp = right->ArrayAccess_value;
+				nodeTmp.right = rightTmp.arr;
+				rightTmp.arr = right->GetIndex();
+
+				node->ArrayAccess_value = rightTmp;
+				node->type = ANT_ArrayAccess;
+				right->BinaryOp_value = nodeTmp;
+				right->type = ANT_BinaryOp;
+
+				didFixup = true;
+			}
+		}
+
+
 		if (didFixup) {
 			FixUpOperators(&node->ast->nodes.data[idx], root);
+
+			if (opInfo->precedence < unaryOpPrecedence) {
+			}
 		}
 	} break;
 
