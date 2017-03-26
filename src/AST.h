@@ -28,6 +28,7 @@ enum ASTNodeType {
 	ANT_StringLiteral,
 	ANT_IntegerLiteral,
 	ANT_FloatLiteral,
+	ANT_BoolLiteral,
 	ANT_UnaryOp,
 	ANT_BinaryOp,
 	ANT_Parentheses,
@@ -135,6 +136,11 @@ struct AST_FloatLiteral{
 	float val;
 };
 
+struct AST_BoolLiteral{
+	SubString repr;
+	bool val;
+};
+
 struct AST_UnaryOp{
 	const char* op;
 	ASTIndex val;
@@ -182,6 +188,7 @@ struct ASTNode {
 		AST_FunctionCall       FunctionCall_value;
 		AST_IntegerLiteral     IntegerLiteral_value;
 		AST_StringLiteral      StringLiteral_value;
+		AST_BoolLiteral        BoolLiteral_value;
 		AST_Identifier         Identifier_value;
 		AST_Statement          Statement_value;
 		AST_Parentheses        Parentheses_value;
@@ -296,6 +303,7 @@ struct __PushPopFrame {
 bool ParseTokenStream(TokenStream* stream);
 bool ParseIntLiteral(TokenStream* stream);
 bool ParseStringLiteral(TokenStream* stream);
+bool ParseBoolLiteral(TokenStream* stream);
 bool ParseBinaryOp(TokenStream* stream);
 bool ParseUnaryOp(TokenStream* stream);
 bool ParseValue(TokenStream* stream);

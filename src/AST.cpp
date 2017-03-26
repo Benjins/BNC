@@ -157,6 +157,22 @@ bool ParseIntLiteral(TokenStream* stream) {
 	return isValid;
 }
 
+bool ParseBoolLiteral(TokenStream* stream) {
+	const SubString& tok = stream->CurrTok();
+
+	if (tok == "true" || tok == "false") {
+		stream->index++;
+		ASTNode* node = stream->ast->addNode();
+		node->type = ANT_BoolLiteral;
+		node->BoolLiteral_value.repr = tok;
+		node->BoolLiteral_value.val = (tok == "true");
+
+		return true;
+	}
+
+	return false;
+}
+
 bool ParseBinaryOp(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
 	if (ParseSingleValue(stream)) {
@@ -267,6 +283,9 @@ bool ParseSingleValueCommon(TokenStream* stream) {
 		FRAME_SUCCES();
 	}
 	else if (ParseStringLiteral(stream)) {
+		FRAME_SUCCES();
+	}
+	else if (ParseBoolLiteral(stream)) {
 		FRAME_SUCCES();
 	}
 	else if (ParseArrayAccess(stream)) {
@@ -800,6 +819,11 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 	case ANT_IntegerLiteral: {
 		INDENT(indentation);
 		printf("Int lit: %d\n", node->IntegerLiteral_value.val);
+	} break;
+
+	case ANT_BoolLiteral: {
+		INDENT(indentation);
+		printf("Bool lit: %s\n", node->BoolLiteral_value.val ? "T" : "F");
 	} break;
 
 	case ANT_StringLiteral: {

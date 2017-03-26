@@ -13,6 +13,8 @@ ms :: struct {
 
 y: float^[1 + 22 * 4 + 1]^ = 4;
 
+ss: bool = true;
+st: bool = false;
 
 /*
 pow :: (b : int, e : int) -> int {
