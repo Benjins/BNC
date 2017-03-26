@@ -202,18 +202,28 @@ bool ParseUnaryOp(TokenStream* stream) {
 		}
 	}
 	else if (ParseSingleValueNoUnary(stream)) {
-		ASTIndex val = stream->ast->GetCurrIdx();
-		if (ExpectAndEatOneOfWords(stream, unaryOperators, BNS_ARRAY_COUNT(unaryOperators), &opIdx)) {
-			if (const UnaryOperator* op = GetUnaryInfoForOp(unaryOperators[opIdx])) {
-				if (op->pos & UOP_Post) {
-					ASTNode* node = stream->ast->addNode();
-					node->type = ANT_UnaryOp;
-					node->UnaryOp_value.op = unaryOperators[opIdx];
-					node->UnaryOp_value.val = val;
+		bool success = false;
+		while (true) {
+			ASTIndex val = stream->ast->GetCurrIdx();
+			if (ExpectAndEatOneOfWords(stream, unaryOperators, BNS_ARRAY_COUNT(unaryOperators), &opIdx)) {
+				if (const UnaryOperator* op = GetUnaryInfoForOp(unaryOperators[opIdx])) {
+					if (op->pos & UOP_Post) {
+						ASTNode* node = stream->ast->addNode();
+						node->type = ANT_UnaryOp;
+						node->UnaryOp_value.op = unaryOperators[opIdx];
+						node->UnaryOp_value.val = val;
 
-					FRAME_SUCCES();
+						success = true;
+					}
 				}
 			}
+			else {
+				break;
+			}
+		}
+
+		if (success) {
+			FRAME_SUCCES();
 		}
 	}
 
@@ -326,32 +336,92 @@ bool ParseArrayAccess(TokenStream* stream) {
 }
 
 bool ParseType(TokenStream* stream) {
-	//if (ParseFunctionCall(stream)) {
-	//	ANT_TypeGeneric
-	//	stream->ast->nodes;
-	//}
-	if (ParseIdentifier(stream)) {
+	PUSH_STREAM_FRAME(stream);
+
+	if (ParseGenericType(stream) || ParseIdentifier(stream)) {
 		ASTIndex identIdx = stream->ast->GetCurrIdx();
 
-		ASTNode* node = stream->ast->addNode();
-		node->type = ANT_TypeSimple;
-		node->TypeSimple_value.name = identIdx;
+		bool success = true;
+		while (true) {
+			if (ExpectAndEatWord(stream, "^")) {
+				ASTIndex currIdx = stream->ast->GetCurrIdx();
 
-		return true;
+				ASTNode* node = stream->ast->addNode();
+				node->type = ANT_TypePointer;
+				node->TypePointer_value.childType = currIdx;
+			}
+			else if (ExpectAndEatWord(stream, "[")) {
+				ASTIndex currIdx = stream->ast->GetCurrIdx();
+				if (ParseValue(stream)) {
+					ASTIndex arrLenIdx = stream->ast->GetCurrIdx();
+					if (ExpectAndEatWord(stream, "]")) {
+						ASTNode* node = stream->ast->addNode();
+						node->type = ANT_TypeArray;
+						node->TypeArray_value.childType = currIdx;
+						node->TypeArray_value.length = arrLenIdx;
+					}
+					// deal_with_it.gif
+					else { success = false; break; }
+				}
+				else if (ExpectAndEatWord(stream, "..")) {
+					if (ExpectAndEatWord(stream, "]")) {
+						ASTNode* node = stream->ast->addNode();
+						node->type = ANT_TypeArray;
+						node->TypeArray_value.childType = currIdx;
+						node->TypeArray_value.length = ARRAY_DYNAMIC_LEN;
+					}
+				}
+				else { success = false; break; }
+			}
+			else {
+				break;
+			}
+		}
+
+		if (success) {
+			FRAME_SUCCES();
+		}
 	}
 
 	return false;
 }
 
 bool ParseGenericType(TokenStream* stream) {
-	return false;
-}
+	PUSH_STREAM_FRAME(stream);
+	if (ParseIdentifier(stream)) {
+		ASTIndex callIdx = stream->ast->GetCurrIdx();
+		if (ExpectAndEatWord(stream, "(")) {
+			Vector<ASTIndex> argIndices;
+			while (true) {
+				if (ParseValue(stream) || ParseType(stream)) {
+					argIndices.PushBack(stream->ast->GetCurrIdx());
 
-bool ParseArrayType(TokenStream* stream) {
-	return false;
-}
+					if (ExpectAndEatWord(stream, ",")) {
+						// Do nothing I guess?
+					}
+					else if (CheckNextWord(stream, ")")) {
+						break;
+					}
+					else {
+						return false;
+					}
+				}
+				else {
+					break;
+				}
+			}
 
-bool ParsePointerType(TokenStream* stream) {
+			if (ExpectAndEatWord(stream, ")")) {
+				ASTNode* node = stream->ast->addNode();
+				node->type = ANT_TypeGeneric;
+				node->TypeGeneric_value.childType = callIdx;
+				node->TypeGeneric_value.args = argIndices;
+
+				FRAME_SUCCES();
+			}
+		}
+	}
+
 	return false;
 }
 
@@ -388,11 +458,6 @@ bool ParseFunctionCall(TokenStream* stream) {
 
 				FRAME_SUCCES();
 			}
-		}
-		else {
-			// We got a var or something
-			// TODO: Other checks to make?
-			return false;
 		}
 	}
 
@@ -883,6 +948,50 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 		printf("Type '%.*s'\n", BNS_LEN_START(type->Identifier_value.name));
 	} break;
 
+	case ANT_TypeArray: {
+		ASTNode* subtype = &node->ast->nodes.data[node->TypeArray_value.childType];
+		INDENT(indentation);
+		printf("Type Array\n");
+
+		INDENT(indentation);
+		printf("Array len:\n");
+		if (node->TypeArray_value.length == ARRAY_DYNAMIC_LEN) {
+			INDENT(indentation + 1);
+			printf("Dynamic.\n");
+		}
+		else {
+			ASTNode* length = &node->ast->nodes.data[node->TypeArray_value.length];
+			DisplayTree(length, indentation + 1);
+		}
+
+		INDENT(indentation);
+		printf("Array subtype:\n");
+		DisplayTree(subtype, indentation + 1);
+	} break;
+
+	case ANT_TypeGeneric: {
+		ASTNode* subtype = &node->ast->nodes.data[node->TypeGeneric_value.childType];
+		INDENT(indentation);
+		printf("Type Generic\n");
+		DisplayTree(subtype, indentation + 1);
+
+		for (int i = 0; i < node->TypeGeneric_value.args.count; i++) {
+			ASTIndex argIdx = node->TypeGeneric_value.args.data[i];
+			ASTNode* arg = &node->ast->nodes.data[argIdx];
+			INDENT(indentation);
+			printf("Generic arg %d\n", i);
+			DisplayTree(arg, indentation + 1);
+		}
+	} break;
+
+	case ANT_TypePointer: {
+		ASTNode* subtype = &node->ast->nodes.data[node->TypePointer_value.childType];
+
+		INDENT(indentation);
+		printf("Type Pointer\n");
+		DisplayTree(subtype, indentation + 1);
+	} break;
+
 	case ANT_StructDefinition: {
 		{
 			ASTNode* name = &node->ast->nodes.data[node->StructDefinition_value.structName];
@@ -1154,8 +1263,10 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 	} break;
 
 	case ANT_VariableDecl: {
-		ASTNode* val = &node->ast->nodes.data[node->VariableDecl_value.initValue];
+		ASTNode* val  = &node->ast->nodes.data[node->VariableDecl_value.initValue];
+		ASTNode* type = &node->ast->nodes.data[node->VariableDecl_value.type];
 		FixUpOperators(val, root);
+		FixUpOperators(type, root);
 	} break;
 
 	case ANT_Scope: {
@@ -1170,6 +1281,15 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 	case ANT_FunctionCall: {
 		for (int i = 0; i < node->FunctionCall_value.args.count; i++) {
 			ASTIndex argIdx = node->FunctionCall_value.args.data[i];
+			ASTNode* arg = &node->ast->nodes.data[argIdx];
+
+			FixUpOperators(arg, root);
+		}
+	} break;
+
+	case ANT_TypeGeneric: {
+		for (int i = 0; i < node->TypeGeneric_value.args.count; i++) {
+			ASTIndex argIdx = node->TypeGeneric_value.args.data[i];
 			ASTNode* arg = &node->ast->nodes.data[argIdx];
 
 			FixUpOperators(arg, root);
@@ -1229,6 +1349,19 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 			FixUpOperators(stmt, node);
 		}
 
+	} break;
+
+	case ANT_TypeArray: {
+		ASTNode* subtype = &node->ast->nodes.data[node->TypeArray_value.childType];
+		ASTNode* length  = &node->ast->nodes.data[node->TypeArray_value.length];
+
+		FixUpOperators(subtype);
+		FixUpOperators(length);
+	} break;
+
+	case ANT_TypePointer: {
+		ASTNode* subtype = &node->ast->nodes.data[node->TypePointer_value.childType];
+		FixUpOperators(subtype);
 	} break;
 
 	case ANT_ReturnStatement: {

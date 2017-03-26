@@ -78,6 +78,9 @@ struct AST_FieldAccess {
 struct AST_TypeSimple{
 	ASTIndex name;
 };
+
+#define ARRAY_DYNAMIC_LEN -1
+
 struct AST_TypeArray{
 	ASTIndex childType;
 	ASTIndex length;
@@ -89,7 +92,6 @@ struct AST_TypeGeneric{
 };
 struct AST_TypePointer {
 	ASTIndex childType;
-	int indirectionLevel;
 };
 
 struct AST_Statement {
@@ -187,6 +189,9 @@ struct ASTNode {
 		AST_VariableAssign     VariableAssign_value;
 		AST_VariableDecl       VariableDecl_value;
 		AST_TypeSimple         TypeSimple_value;
+		AST_TypeArray          TypeArray_value;
+		AST_TypeGeneric        TypeGeneric_value;
+		AST_TypePointer        TypePointer_value;
 		AST_Scope              Scope_value;
 		AST_IfStatement        IfStatement_value;
 		AST_StructDefinition   StructDefinition_value;
