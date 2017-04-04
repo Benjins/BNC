@@ -278,16 +278,16 @@ struct TokenStream {
 	}
 };
 
-struct __PushPopFrame {
+struct __PushPopASTFrame {
 	TokenStream* stream;
 	bool success;
-	__PushPopFrame(TokenStream* _stream) {
+	__PushPopASTFrame(TokenStream* _stream) {
 		stream = _stream;
 		_stream->PushFrame();
 		success = false;
 	}
 
-	~__PushPopFrame() {
+	~__PushPopASTFrame() {
 		if (success) {
 			stream->frames.PopBack();
 		}
@@ -297,7 +297,7 @@ struct __PushPopFrame {
 	}
 };
 
-#define PUSH_STREAM_FRAME(stream) __PushPopFrame _frame_stream(stream)
+#define PUSH_STREAM_FRAME(stream) __PushPopASTFrame _frame_stream(stream)
 #define FRAME_SUCCES() _frame_stream.success = true; return true
 
 bool ParseTokenStream(TokenStream* stream);

@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "AST.cpp"
+#include "semantics.cpp"
 #include "../CppUtils/vector.cpp"
 #include "../CppUtils/assert.cpp"
 #include "../CppUtils/strings.cpp"
@@ -12,13 +13,11 @@ int main(int argc, char** argv){
 	AST ast;
 	ast.ConstructFromString(code);
 
-	DisplayTree(&ast.nodes.Back());
-
-	printf("\n\n---Fixing up ops---\n\n");
-
 	FixUpOperators(&ast.nodes.Back());
-	printf("\n");
 	DisplayTree(&ast.nodes.Back());
+
+	SemanticContext sc;
+	DoSemantics(&ast, &sc);
 	
 	return 0;
 }
