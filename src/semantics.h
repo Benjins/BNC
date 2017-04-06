@@ -4,12 +4,50 @@
 #pragma once
 
 #include "../CppUtils/vector.h"
+#include "../CppUtils/disc_union.h"
 
 #include "AST.h"
 
-struct TypeInfo {
+enum TypeCheckResult {
+	TCR_NoProgress,
+	TCR_SomeProgress,
+	TCR_Success,
+	TCR_Error
+};
+
+enum TypeInfoKind {
+	TIK_Simple,
+	TIK_Struct,
+	TIK_Pointer,
+	TIK_Array
+};
+
+struct BuiltinTypeInfo {
 	const char* name;
 };
+
+struct StructTypeInfo {
+	SubString name;
+	int index;
+};
+
+struct PointerTypeInfo {
+	int subType;
+};
+
+struct ArrayTypeInfo {
+	int subType;
+	int arrayLen;
+};
+
+#define DISC_LIST(mac)   \
+	mac(BuiltinTypeInfo)  \
+	mac(StructTypeInfo)  \
+	mac(PointerTypeInfo) \
+	mac(ArrayTypeInfo)
+
+// This generates the actual struct body
+DEFINE_DISCRIMINATED_UNION(TypeInfo, DISC_LIST)
 
 typedef int TypeIndex;
 
@@ -78,6 +116,8 @@ struct __PushPopSCScope {
 		sc->PopScope();
 	}
 };
+
+#define PUSH_SC_SCOPE(sc) __PushPopSCScope __sc_scope (sc)
 
 void DoSemantics(AST* ast, SemanticContext* sc);
 

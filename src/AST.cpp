@@ -360,6 +360,10 @@ bool ParseType(TokenStream* stream) {
 	if (ParseGenericType(stream) || ParseIdentifier(stream)) {
 		ASTIndex identIdx = stream->ast->GetCurrIdx();
 
+		ASTNode* node = stream->ast->addNode();
+		node->type = ANT_TypeSimple;
+		node->TypeSimple_value.name = identIdx;
+
 		bool success = true;
 		while (true) {
 			if (ExpectAndEatWord(stream, "^")) {
