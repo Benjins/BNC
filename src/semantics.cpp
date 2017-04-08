@@ -167,6 +167,10 @@ TypeCheckResult TypeCheckVarDecl(ASTNode* decl, SemanticContext* sc, int* outTyp
 	ASTNode* type = &decl->ast->nodes.data[decl->VariableDecl_value.type];
 	int varTypeIdx = GetTypeIndex(type, sc);
 
+	if (varTypeIdx < 0) {
+		return TCR_Error;
+	}
+
 	ASTIndex valNodeIdx = decl->VariableDecl_value.initValue;
 	if (valNodeIdx < 0) {
 		*outTypeIdx = varTypeIdx;
