@@ -21,7 +21,14 @@ st: bool = false;
 vec3i :: struct {
 x: int = 0;
 y: int = 0;
-z: int = 0;
+z: int = 0;// 4 - 2 * (3 + -555);
+}
+
+
+vec3 :: struct {
+x: float = 0.0;
+y: float = 0.0;
+z: float = 0.0*123.4;// 4 - 2 * (3 + -555);
 }
 
 

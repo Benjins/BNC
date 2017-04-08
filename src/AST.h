@@ -187,6 +187,7 @@ struct ASTNode {
 		AST_UnaryOp            UnaryOp_value;
 		AST_FunctionCall       FunctionCall_value;
 		AST_IntegerLiteral     IntegerLiteral_value;
+		AST_FloatLiteral       FloatLiteral_value;
 		AST_StringLiteral      StringLiteral_value;
 		AST_BoolLiteral        BoolLiteral_value;
 		AST_Identifier         Identifier_value;
@@ -301,6 +302,7 @@ struct __PushPopASTFrame {
 #define FRAME_SUCCES() _frame_stream.success = true; return true
 
 bool ParseTokenStream(TokenStream* stream);
+bool ParseFloatLiteral(TokenStream* stream);
 bool ParseIntLiteral(TokenStream* stream);
 bool ParseStringLiteral(TokenStream* stream);
 bool ParseBoolLiteral(TokenStream* stream);

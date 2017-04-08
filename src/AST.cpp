@@ -136,6 +136,27 @@ bool ParseStringLiteral(TokenStream* stream) {
 	return false;
 }
 
+bool ParseFloatLiteral(TokenStream* stream) {
+	const SubString& tok = stream->CurrTok();
+	bool isValid = true;
+	for (int i = 0; i < tok.length; i++) {
+		if (!IsNumeric(tok.start[i]) && tok.start[i] != '.') {
+			isValid = false;
+			break;
+		}
+	}
+
+	if (isValid) {
+		stream->index++;
+		ASTNode* node = stream->ast->addNode();
+		node->type = ANT_FloatLiteral;
+		node->FloatLiteral_value.repr = tok;
+		node->FloatLiteral_value.val = Atof(tok.start);
+	}
+
+	return isValid;
+}
+
 bool ParseIntLiteral(TokenStream* stream) {
 	const SubString& tok = stream->CurrTok();
 	bool isValid = true;
@@ -280,6 +301,9 @@ bool ParseParenthesesValue(TokenStream* stream) {
 bool ParseSingleValueCommon(TokenStream* stream) {
 	PUSH_STREAM_FRAME(stream);
 	if (ParseIntLiteral(stream)) {
+		FRAME_SUCCES();
+	}
+	else if (ParseFloatLiteral(stream)) {
 		FRAME_SUCCES();
 	}
 	else if (ParseStringLiteral(stream)) {
@@ -823,6 +847,11 @@ void DisplayTree(ASTNode* node, int indentation /*= 0*/) {
 	case ANT_IntegerLiteral: {
 		INDENT(indentation);
 		printf("Int lit: %d\n", node->IntegerLiteral_value.val);
+	} break;
+
+	case ANT_FloatLiteral: {
+		INDENT(indentation);
+		printf("Float lit: %f\n", node->FloatLiteral_value.val);
 	} break;
 
 	case ANT_BoolLiteral: {

@@ -117,7 +117,11 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 			return TCR_Error;
 		}
 	} break;
-
+	
+	case ANT_Parentheses: {
+		ASTNode* innerVal = &val->ast->nodes.data[val->Parentheses_value.val];
+		return TypeCheckValue(innerVal, sc, outTypeIdx);
+	} break;
 
 	case ANT_UnaryOp: {
 		int lType, rType;
@@ -163,11 +167,19 @@ TypeCheckResult TypeCheckVarDecl(ASTNode* decl, SemanticContext* sc, int* outTyp
 	ASTNode* type = &decl->ast->nodes.data[decl->VariableDecl_value.type];
 	int varTypeIdx = GetTypeIndex(type, sc);
 
-	int valTypeIdx;
-	ASTNode* val = &decl->ast->nodes.data[decl->VariableDecl_value.initValue];
-	TypeCheckValue(val, sc, &valTypeIdx);
+	ASTIndex valNodeIdx = decl->VariableDecl_value.initValue;
+	if (valNodeIdx < 0) {
+		*outTypeIdx = varTypeIdx;
+		return TCR_Success;
+	}
 
-	if (varTypeIdx == valTypeIdx) {
+	int valTypeIdx;
+	ASTNode* val = &decl->ast->nodes.data[valNodeIdx];
+	TypeCheckResult vRes = TypeCheckValue(val, sc, &valTypeIdx);
+	if (vRes == TCR_Error) {
+		return TCR_Error;
+	}
+	else if (varTypeIdx == valTypeIdx) {
 		*outTypeIdx = varTypeIdx;
 		return TCR_Success;
 	}
