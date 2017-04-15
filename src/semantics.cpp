@@ -2,7 +2,8 @@
 
 TypeCheckResult TypeCheckVarDecl(ASTNode* decl, SemanticContext* sc, int* outTypeIdx, bool addToScope = true);
 TypeCheckResult TypeCheckStructDef(StructDef* def, SemanticContext* sc, AST* ast);
-void DoTypeChecking(ASTNode* node, SemanticContext* sc);
+TypeCheckResult TypeCheckFunctionDef(FuncDef* def, SemanticContext* sc, AST* ast);
+TypeCheckResult DoTypeChecking(ASTNode* node, SemanticContext* sc, FuncDef* currFun = nullptr);
 
 void InitSemanticContextWithBuiltinTypes(SemanticContext* sc) {
 	TypeInfo info;
@@ -23,6 +24,16 @@ int GetSimpleTypeIndex(const SubString& typeName, SemanticContext* sc) {
 		}
 		else if (ptr->type == TypeInfo::UE_StructTypeInfo && typeName == ((StructTypeInfo*)&ptr->StructTypeInfo_data)->name) {
 			return ptr - sc->knownTypes.data;
+		}
+	}
+
+	return -1;
+}
+
+int GetTypeofVariable(SubString name, SemanticContext* sc) {
+	BNS_VEC_FOREACH(sc->varsInScope) {
+		if (ptr->name == name) {
+			return ptr->typeIndex;
 		}
 	}
 
@@ -94,9 +105,25 @@ void DoSemantics(AST* ast, SemanticContext* sc) {
 		}
 	}
 
+	BNS_VEC_FOREACH(sc->definedFunctions) {
+		TypeCheckResult res = TypeCheckFunctionDef(ptr, sc, ast);
+		if (res != TCR_Success) {
+			printf("Failed to type-check func def.\n");
+		}
+		else {
+			printf("Type checking worked!\n");
+		}
+	}
+
 	BNS_VEC_FOREACH(topStmts) {
 		ASTNode* topStmt = &ast->nodes.data[*ptr];
-		DoTypeChecking(topStmt, sc);
+		TypeCheckResult res = DoTypeChecking(topStmt, sc);
+		if (res != TCR_Success) {
+			printf("Failed to type-check statement.\n");
+		}
+		else {
+			printf("Type checking worked!\n");
+		}
 	}
 }
 
@@ -121,6 +148,16 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 	case ANT_Parentheses: {
 		ASTNode* innerVal = &val->ast->nodes.data[val->Parentheses_value.val];
 		return TypeCheckValue(innerVal, sc, outTypeIdx);
+	} break;
+
+	case ANT_Identifier: {
+		TypeIndex idx = GetTypeofVariable(val->Identifier_value.name, sc);
+		if (idx == -1) {
+			return TCR_Error;
+		}
+
+		*outTypeIdx = idx;
+		return TCR_Success;
 	} break;
 
 	case ANT_UnaryOp: {
@@ -174,6 +211,13 @@ TypeCheckResult TypeCheckVarDecl(ASTNode* decl, SemanticContext* sc, int* outTyp
 	ASTIndex valNodeIdx = decl->VariableDecl_value.initValue;
 	if (valNodeIdx < 0) {
 		*outTypeIdx = varTypeIdx;
+		if (addToScope) {
+			VariableDecl vardecl;
+			vardecl.idx = decl - decl->ast->nodes.data;
+			vardecl.name = decl->ast->nodes.data[decl->VariableDecl_value.varName].Identifier_value.name;
+			vardecl.typeIndex = varTypeIdx;
+			sc->varsInScope.PushBack(vardecl);
+		}
 		return TCR_Success;
 	}
 
@@ -185,6 +229,15 @@ TypeCheckResult TypeCheckVarDecl(ASTNode* decl, SemanticContext* sc, int* outTyp
 	}
 	else if (varTypeIdx == valTypeIdx) {
 		*outTypeIdx = varTypeIdx;
+
+		if (addToScope) {
+			VariableDecl vardecl;
+			vardecl.idx = decl - decl->ast->nodes.data;
+			vardecl.name = decl->ast->nodes.data[decl->VariableDecl_value.varName].Identifier_value.name;
+			vardecl.typeIndex = varTypeIdx;
+			sc->varsInScope.PushBack(vardecl);
+		}
+
 		return TCR_Success;
 	}
 	else {
@@ -215,15 +268,87 @@ TypeCheckResult TypeCheckStructDef(StructDef* def, SemanticContext* sc, AST* ast
 	return TCR_Success;
 }
 
-void DoTypeChecking(ASTNode* node, SemanticContext* sc) {
+TypeCheckResult TypeCheckFunctionDef(FuncDef* def, SemanticContext* sc, AST* ast) {
+	PUSH_SC_SCOPE(sc);
+
+	ASTNode* defNode = &ast->nodes.data[def->idx];
+
+	ASTNode* retNode = &ast->nodes.data[defNode->FunctionDefinition_value.returnType];
+
+	def->retType = GetTypeIndex(retNode, sc);
+	if (def->retType < 0) {
+		return TCR_Error;
+	}
+
+	BNS_VEC_FOREACH(defNode->FunctionDefinition_value.params) {
+		int paramIdx;
+		TypeCheckResult paramRes = TypeCheckVarDecl(&ast->nodes.data[*ptr], sc, &paramIdx);
+		if (paramRes == TCR_Error) {
+			return TCR_Error;
+		}
+	}
+
+	ASTNode* scopeNode = &ast->nodes.data[defNode->FunctionDefinition_value.bodyScope];
+
+	TypeCheckResult scopeRes = DoTypeChecking(scopeNode, sc, def);
+
+	return scopeRes;
+}
+
+TypeCheckResult DoTypeChecking(ASTNode* node, SemanticContext* sc, FuncDef* currFun /*= nullptr*/) {
 	switch (node->type) {
 	case ANT_StructDefinition: {
-		
+		// Err..we already did this?
+		return TCR_Success;
 	};
+
+	case ANT_FunctionDefinition: {
+		// Err..we already did this?
+		return TCR_Success;	
+	} break;
 
 	case ANT_Statement: {
-
+		ASTNode* root = &node->ast->nodes.data[node->Statement_value.root];
+		return DoTypeChecking(root, sc, currFun);
 	};
+
+	case ANT_ReturnStatement: {
+		if (currFun == nullptr) {
+			return TCR_Error;
+		}
+
+		ASTNode* val = &node->ast->nodes.data[node->ReturnStatement_value.retVal];
+
+		int retType;
+		TypeCheckResult res = TypeCheckValue(val, sc, &retType);
+
+		if (res == TCR_Success && retType == currFun->retType){
+			return TCR_Success;
+		}
+		else {
+			return TCR_Error;
+		}
+	} break;
+
+	case ANT_Scope: {
+		BNS_VEC_FOREACH(node->Scope_value.statements) {
+			ASTNode* stmt = &node->ast->nodes.data[*ptr];
+			TypeCheckResult res = DoTypeChecking(stmt, sc, currFun);
+			if (res == TCR_Error) {
+				return TCR_Error;
+			}
+		}
+
+		return TCR_Success;
+	} break;
+
+	case ANT_VariableDecl: {
+		int typeIdx;
+		return TypeCheckVarDecl(node, sc, &typeIdx);
+	} break;
 	}
+
+	ASSERT(false);
+	return TCR_Error;
 }
 

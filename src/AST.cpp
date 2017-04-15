@@ -138,7 +138,7 @@ bool ParseStringLiteral(TokenStream* stream) {
 
 bool ParseFloatLiteral(TokenStream* stream) {
 	const SubString& tok = stream->CurrTok();
-	bool isValid = true;
+	bool isValid = tok.length > 0 && IsNumeric(tok.start[0]);
 	for (int i = 0; i < tok.length; i++) {
 		if (!IsNumeric(tok.start[i]) && tok.start[i] != '.') {
 			isValid = false;
@@ -1320,9 +1320,13 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 	} break;
 
 	case ANT_VariableDecl: {
-		ASTNode* val  = &node->ast->nodes.data[node->VariableDecl_value.initValue];
+		ASTIndex valIdx = node->VariableDecl_value.initValue;
+		if (valIdx >= 0) {
+			ASTNode* val = &node->ast->nodes.data[valIdx];
+			FixUpOperators(val, root);
+		}
+
 		ASTNode* type = &node->ast->nodes.data[node->VariableDecl_value.type];
-		FixUpOperators(val, root);
 		FixUpOperators(type, root);
 	} break;
 
@@ -1410,10 +1414,13 @@ void FixUpOperators(ASTNode* node, ASTNode* root = nullptr) {
 
 	case ANT_TypeArray: {
 		ASTNode* subtype = &node->ast->nodes.data[node->TypeArray_value.childType];
-		ASTNode* length  = &node->ast->nodes.data[node->TypeArray_value.length];
-
 		FixUpOperators(subtype);
-		FixUpOperators(length);
+
+		ASTIndex lengthIdx = node->TypeArray_value.length;
+		if (lengthIdx >= 0) {
+			ASTNode* length = &node->ast->nodes.data[lengthIdx];
+			FixUpOperators(length);
+		}
 	} break;
 
 	case ANT_TypePointer: {
