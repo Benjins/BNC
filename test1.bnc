@@ -26,14 +26,14 @@ z: int = 0;// 4 - 2 * (3 + -555);
 }
 */
 
-c: int = 3;
+c: int = 4;
 
 pow :: (b : int, e : int) -> int {
-	return -b * e;
+	return -b * e + c;
 }
 
 ff :: () -> string {
-	return "hi";
+	return "yo";
 }
 
 /*

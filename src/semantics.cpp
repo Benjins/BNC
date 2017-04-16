@@ -59,14 +59,10 @@ void DoSemantics(AST* ast, SemanticContext* sc) {
 	InitSemanticContextWithBuiltinTypes(sc);
 
 	const Vector<ASTIndex>& topStmts = root->Root_value.topLevelStatements;
+	Vector<ASTIndex> globalVarDecls;
 	BNS_VEC_FOREACH(topStmts) {
 		ASTNode* topStmt = &ast->nodes.data[*ptr];
-		if (topStmt->type == ANT_VariableDecl) {
-			VariableDecl decl;
-			decl.idx = *ptr;
-			sc->varsInScope.PushBack(decl);
-		}
-		else if (topStmt->type == ANT_FunctionDefinition) {
+		if (topStmt->type == ANT_FunctionDefinition) {
 			FuncDef def;
 			def.idx = *ptr;
 			sc->definedFunctions.PushBack(def);
@@ -88,9 +84,7 @@ void DoSemantics(AST* ast, SemanticContext* sc) {
 		else if (topStmt->type == ANT_Statement) {
 			ASTNode* stmt = &ast->nodes.data[topStmt->Statement_value.root];
 			if (stmt->type == ANT_VariableDecl) {
-				VariableDecl decl;
-				decl.idx = stmt->GetIndex();
-				sc->varsInScope.PushBack(decl);
+				globalVarDecls.PushBack(stmt->GetIndex());
 			}
 		}
 	}
@@ -105,21 +99,21 @@ void DoSemantics(AST* ast, SemanticContext* sc) {
 		}
 	}
 
+	BNS_VEC_FOREACH(globalVarDecls) {
+		ASTNode* stmt = &ast->nodes.data[*ptr];
+		ASSERT(stmt->type == ANT_VariableDecl);
+
+		int typeIdx;
+		TypeCheckResult res = TypeCheckVarDecl(stmt, sc, &typeIdx);
+		if (res == TCR_Error) {
+			printf("Failed to typecheck var decl\n");
+		}
+	}
+
 	BNS_VEC_FOREACH(sc->definedFunctions) {
 		TypeCheckResult res = TypeCheckFunctionDef(ptr, sc, ast);
 		if (res != TCR_Success) {
 			printf("Failed to type-check func def.\n");
-		}
-		else {
-			printf("Type checking worked!\n");
-		}
-	}
-
-	BNS_VEC_FOREACH(topStmts) {
-		ASTNode* topStmt = &ast->nodes.data[*ptr];
-		TypeCheckResult res = DoTypeChecking(topStmt, sc);
-		if (res != TCR_Success) {
-			printf("Failed to type-check statement.\n");
 		}
 		else {
 			printf("Type checking worked!\n");
