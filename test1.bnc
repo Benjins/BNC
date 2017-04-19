@@ -50,6 +50,14 @@ fg :: () -> int^ {
 	return ci^;
 }
 
+get_val :: (x: int^) -> int {
+	return ^x;
+}
+
+do_work :: () -> int {
+	return get_val(fg());
+}
+
 /*
 gg :: () -> int {
 	return 1;

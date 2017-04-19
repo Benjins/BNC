@@ -271,6 +271,7 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 				if (sc->knownTypes.data[lType].type == TypeInfo::UE_PointerTypeInfo) {
 					TypeIndex subType = ((PointerTypeInfo*)sc->knownTypes.data[lType].PointerTypeInfo_data)->subType;
 					*outTypeIdx = subType;
+					return TCR_Success;
 				}
 				else {
 					return TCR_Error;
