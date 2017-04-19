@@ -554,7 +554,8 @@ bool ExpectAndEatOneOfWords(TokenStream* stream, const char** strs, const int co
 
 const char* reservedWords[] = {
 	"if",
-	"while"
+	"while",
+	"return"
 };
 
 bool IsReservedWord(const SubString& tok) {

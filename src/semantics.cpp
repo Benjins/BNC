@@ -60,6 +60,23 @@ TypeIndex GetTypeofVariable(SubString name, SemanticContext* sc) {
 	return -1;
 }
 
+TypeIndex GetOrCreatePtrReferenceOf(TypeIndex subTypeIdx, SemanticContext* sc) {
+	BNS_VEC_FOREACH(sc->knownTypes) {
+		if (ptr->type == TypeInfo::UE_PointerTypeInfo) {
+			if (((PointerTypeInfo*)ptr->PointerTypeInfo_data)->subType == subTypeIdx) {
+				return (ptr - sc->knownTypes.data);
+			}
+		}
+	}
+
+	PointerTypeInfo newInfo;
+	newInfo.subType = subTypeIdx;
+	TypeInfo info;
+	info = newInfo;
+	sc->knownTypes.PushBack(info);
+	return sc->knownTypes.count - 1;
+}
+
 TypeIndex GetTypeIndex(ASTNode* typeNode, SemanticContext* sc) {
 	if (typeNode->type == ANT_TypeSimple) {
 		ASTNode* typeIdent = &typeNode->ast->nodes.data[typeNode->TypeSimple_value.name];
@@ -70,20 +87,7 @@ TypeIndex GetTypeIndex(ASTNode* typeNode, SemanticContext* sc) {
 		ASTIndex subIdx = typeNode->TypePointer_value.childType;
 		ASTNode* subNode = &typeNode->ast->nodes.data[subIdx];
 		TypeIndex subTypeIdx = GetTypeIndex(subNode, sc);
-		BNS_VEC_FOREACH(sc->knownTypes) {
-			if (ptr->type == TypeInfo::UE_PointerTypeInfo) {
-				if (((PointerTypeInfo*)ptr->PointerTypeInfo_data)->subType == subTypeIdx) {
-					return (ptr - sc->knownTypes.data);
-				}
-			}
-		}
-
-		PointerTypeInfo newInfo;
-		newInfo.subType = subTypeIdx;
-		TypeInfo info;
-		info = newInfo;
-		sc->knownTypes.PushBack(info);
-		return sc->knownTypes.count - 1;
+		return GetOrCreatePtrReferenceOf(subTypeIdx, sc);
 	}
 	else {
 		// TODO: Pointer, Array, Generic
@@ -258,16 +262,34 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 	} break;
 
 	case ANT_UnaryOp: {
-		int lType, rType;
+		int lType;
 		ASTNode* subVal = &val->ast->nodes.data[val->UnaryOp_value.val];
 		TypeCheckResult sRes = TypeCheckValue(subVal, sc, &lType);
 
-		if (sRes == TCR_Success) {
-			*outTypeIdx = lType;
-			return TCR_Success;
+		if (StrEqual(val->UnaryOp_value.op, "^")) {
+			if (val->UnaryOp_value.isPre) {
+				if (sc->knownTypes.data[lType].type == TypeInfo::UE_PointerTypeInfo) {
+					TypeIndex subType = ((PointerTypeInfo*)sc->knownTypes.data[lType].PointerTypeInfo_data)->subType;
+					*outTypeIdx = subType;
+				}
+				else {
+					return TCR_Error;
+				}
+			}
+			else {
+				TypeIndex newPtrType = GetOrCreatePtrReferenceOf(lType, sc);
+				*outTypeIdx = newPtrType;
+				return TCR_Success;
+			}
 		}
 		else {
-			return TCR_Error;
+			if (sRes == TCR_Success) {
+				*outTypeIdx = lType;
+				return TCR_Success;
+			}
+			else {
+				return TCR_Error;
+			}
 		}
 	} break;
 

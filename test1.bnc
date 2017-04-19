@@ -18,8 +18,7 @@ ss: bool = true;
 st: bool = false;
 */
 
-
-
+/*
 vec3i :: struct {
 x: int = 0;
 y: int = 0;
@@ -42,6 +41,13 @@ make_vec :: (x: float, y: float, z: float) -> vec3 {
 	v.y = y;
 	v.z = z;
 	return v;
+}
+*/
+
+ci: int = 4;
+
+fg :: () -> int^ {
+	return ci^;
 }
 
 /*
