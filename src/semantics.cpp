@@ -5,6 +5,16 @@ TypeCheckResult TypeCheckStructDef(StructDef* def, SemanticContext* sc, AST* ast
 TypeCheckResult TypeCheckFunctionDef(FuncDef* def, SemanticContext* sc, AST* ast);
 TypeCheckResult DoTypeChecking(ASTNode* node, SemanticContext* sc, FuncDef* currFun = nullptr);
 
+FuncDef* GetFuncDefByName(const SubString& name, SemanticContext* sc) {
+	BNS_VEC_FOREACH(sc->definedFunctions) {
+		if (ptr->name == name) {
+			return ptr;
+		}
+	}
+
+	return nullptr;
+}
+
 void InitSemanticContextWithBuiltinTypes(SemanticContext* sc) {
 	TypeInfo info;
 	BuiltinTypeInfo simple;
@@ -65,6 +75,8 @@ void DoSemantics(AST* ast, SemanticContext* sc) {
 		if (topStmt->type == ANT_FunctionDefinition) {
 			FuncDef def;
 			def.idx = *ptr;
+			ASTIndex funcNameIdx = ast->nodes.data[*ptr].FunctionDefinition_value.name;
+			def.name = ast->nodes.data[funcNameIdx].Identifier_value.name;
 			sc->definedFunctions.PushBack(def);
 		}
 		else if (topStmt->type == ANT_StructDefinition) {
@@ -137,6 +149,35 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 		else {
 			return TCR_Error;
 		}
+	} break;
+
+	case ANT_FunctionCall: {
+		ASTNode* funcVal = &val->ast->nodes.data[val->FunctionCall_value.func];
+		ASSERT(funcVal->type == ANT_Identifier);
+		FuncDef* def = GetFuncDefByName(funcVal->Identifier_value.name, sc);
+
+		if (val->FunctionCall_value.args.count != def->argTypes.count) {
+			// Arity mismatch
+			return TCR_Error;
+		}
+
+		for (int i = 0; i < val->FunctionCall_value.args.count; i++) {
+			ASTIndex argIndex = val->FunctionCall_value.args.data[i];
+			ASTNode* argNode = &val->ast->nodes.data[argIndex];
+			int argTypeIdx;
+			TypeCheckResult res = TypeCheckValue(argNode, sc, &argTypeIdx);
+			if (res != TCR_Success) {
+				return TCR_Error;
+			}
+
+			if (argTypeIdx != def->argTypes.data[i]) {
+				return TCR_Error;
+			}
+		}
+
+		*outTypeIdx = def->retType;
+		return TCR_Success;
+
 	} break;
 	
 	case ANT_Parentheses: {
@@ -275,10 +316,13 @@ TypeCheckResult TypeCheckFunctionDef(FuncDef* def, SemanticContext* sc, AST* ast
 	}
 
 	BNS_VEC_FOREACH(defNode->FunctionDefinition_value.params) {
-		int paramIdx;
-		TypeCheckResult paramRes = TypeCheckVarDecl(&ast->nodes.data[*ptr], sc, &paramIdx);
+		int paramTypeIdx;
+		TypeCheckResult paramRes = TypeCheckVarDecl(&ast->nodes.data[*ptr], sc, &paramTypeIdx);
 		if (paramRes == TCR_Error) {
 			return TCR_Error;
+		}
+		else {
+			def->argTypes.PushBack(paramTypeIdx);
 		}
 	}
 

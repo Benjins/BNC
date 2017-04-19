@@ -59,7 +59,9 @@ struct VariableDecl {
 
 struct FuncDef {
 	ASTIndex idx;
+	SubString name;
 	TypeIndex retType;
+	Vector<TypeIndex> argTypes;
 };
 
 struct StructDef {
