@@ -18,16 +18,25 @@ ss: bool = true;
 st: bool = false;
 */
 
-/*
+
 vec3i :: struct {
 x: int = 0;
 y: int = 0;
 z: int = 0;// 4 - 2 * (3 + -555);
 }
-*/
 
-c: int = 4;
+vec3 :: struct {
+x: float = 0.0;
+y: float = 0.0;
+z: float = 0.0;
+}
 
+
+dot :: (a: vec3, b: vec3) -> float{
+	return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+/*
 fac :: (n: int) -> int {
 	return fac(n - 1);
 }
@@ -51,7 +60,7 @@ pow_2 :: () -> int {
 ff :: () -> string {
 	return "yo";
 }
-
+*/
 /*
 vec3 :: struct {
 //x: float = 0.0;

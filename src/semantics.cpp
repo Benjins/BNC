@@ -27,7 +27,7 @@ void InitSemanticContextWithBuiltinTypes(SemanticContext* sc) {
 #undef ADD_SIMPLE_TYPE
 }
 
-int GetSimpleTypeIndex(const SubString& typeName, SemanticContext* sc) {
+TypeIndex GetSimpleTypeIndex(const SubString& typeName, SemanticContext* sc) {
 	BNS_VEC_FOREACH(sc->knownTypes) {
 		if (ptr->type == TypeInfo::UE_BuiltinTypeInfo && typeName == ((BuiltinTypeInfo*)&ptr->BuiltinTypeInfo_data)->name) {
 			return ptr - sc->knownTypes.data;
@@ -40,7 +40,17 @@ int GetSimpleTypeIndex(const SubString& typeName, SemanticContext* sc) {
 	return -1;
 }
 
-int GetTypeofVariable(SubString name, SemanticContext* sc) {
+TypeIndex GetTypeOfField(StructDef* def, const SubString& name, SemanticContext* sc) {
+	BNS_VEC_FOREACH(def->fieldDecls) {
+		if (ptr->name == name) {
+			return ptr->typeIndex;
+		}
+	}
+
+	return -1;
+}
+
+TypeIndex GetTypeofVariable(SubString name, SemanticContext* sc) {
 	BNS_VEC_FOREACH(sc->varsInScope) {
 		if (ptr->name == name) {
 			return ptr->typeIndex;
@@ -50,7 +60,7 @@ int GetTypeofVariable(SubString name, SemanticContext* sc) {
 	return -1;
 }
 
-int GetTypeIndex(ASTNode* typeNode, SemanticContext* sc) {
+TypeIndex GetTypeIndex(ASTNode* typeNode, SemanticContext* sc) {
 	if (typeNode->type == ANT_TypeSimple) {
 		ASTNode* typeIdent = &typeNode->ast->nodes.data[typeNode->TypeSimple_value.name];
 		ASSERT(typeIdent->type == ANT_Identifier);
@@ -136,18 +146,51 @@ void DoSemantics(AST* ast, SemanticContext* sc) {
 TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeIdx) {
 	switch (val->type) {
 	case ANT_BinaryOp: {
-		int lType, rType;
+		
 		ASTNode* left  = &val->ast->nodes.data[val->BinaryOp_value.left];
 		ASTNode* right = &val->ast->nodes.data[val->BinaryOp_value.right];
-		TypeCheckResult lRes = TypeCheckValue(left,  sc, &lType);
-		TypeCheckResult rRes = TypeCheckValue(right, sc, &rType);
-
-		if (lRes == TCR_Success && rRes == TCR_Success && lType == rType) {
-			*outTypeIdx = lType;
-			return TCR_Success;
+		if (StrEqual(val->BinaryOp_value.op, ".")) {
+			int lType;
+			TypeCheckResult lRes = TypeCheckValue(left, sc, &lType);
+			if (lRes == TCR_Success) {
+				if (right->type == ANT_Identifier) {
+					const SubString& fieldName = right->Identifier_value.name;
+					TypeInfo* info = &sc->knownTypes.data[lType];
+					if (info->type == TypeInfo::UE_StructTypeInfo) {
+						StructDef* def = &sc->definedStructs.data[((StructTypeInfo*)info->StructTypeInfo_data)->index];
+						TypeIndex fieldType = GetTypeOfField(def, fieldName, sc);
+						if (fieldType >= 0) {
+							*outTypeIdx = fieldType;
+							return TCR_Success;
+						}
+						else {
+							return TCR_Error;
+						}
+					}
+					else{
+						return TCR_Error;
+					}
+				}
+				else {
+					return TCR_Error;
+				}
+			}
+			else {
+				return TCR_Error;
+			}
 		}
 		else {
-			return TCR_Error;
+			int lType, rType;
+			TypeCheckResult lRes = TypeCheckValue(left, sc, &lType);
+			TypeCheckResult rRes = TypeCheckValue(right, sc, &rType);
+
+			if (lRes == TCR_Success && rRes == TCR_Success && lType == rType) {
+				*outTypeIdx = lType;
+				return TCR_Success;
+			}
+			else {
+				return TCR_Error;
+			}
 		}
 	} break;
 
@@ -294,6 +337,13 @@ TypeCheckResult TypeCheckStructDef(StructDef* def, SemanticContext* sc, AST* ast
 		ASTNode* fieldNode = &ast->nodes.data[*ptr];
 		int fieldTypeIdx;
 		TypeCheckResult fres = TypeCheckVarDecl(fieldNode, sc, &fieldTypeIdx, false);
+
+		VariableDecl decl;
+		decl.idx = *ptr;
+		ASTIndex fieldNameIdx = fieldNode->VariableDecl_value.varName;
+		decl.name = ast->nodes.data[fieldNameIdx].Identifier_value.name;
+		decl.typeIndex = fieldTypeIdx;
+		def->fieldDecls.PushBack(decl);
 
 		if (fres == TCR_Error) {
 			return TCR_Error;
