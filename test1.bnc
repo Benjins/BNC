@@ -19,6 +19,7 @@ st: bool = false;
 */
 
 
+/*
 vec3i :: struct {
 x: int = 0;
 y: int = 0;
@@ -31,9 +32,35 @@ y: float = 0.0;
 z: float = 0.0;
 }
 
-
 dot :: (a: vec3, b: vec3) -> float{
 	return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+*/
+
+gg :: () -> int {
+	return 1;
+}
+
+ff :: () -> int {
+	a : int = gg();
+	a = gg();
+	return gg();
+}
+
+
+dd: int^;
+
+get_dd :: () -> int^ {
+	return dd;
+}
+
+do_dd :: (a: int^, b : int^) -> int {
+	return 2;
+}
+
+do_thing :: () -> int {
+	do_dd(get_dd(), get_dd());
+	return 1;
 }
 
 /*

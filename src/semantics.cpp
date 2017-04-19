@@ -66,6 +66,25 @@ TypeIndex GetTypeIndex(ASTNode* typeNode, SemanticContext* sc) {
 		ASSERT(typeIdent->type == ANT_Identifier);
 		return GetSimpleTypeIndex(typeIdent->Identifier_value.name, sc);
 	}
+	else if (typeNode->type == ANT_TypePointer) {
+		ASTIndex subIdx = typeNode->TypePointer_value.childType;
+		ASTNode* subNode = &typeNode->ast->nodes.data[subIdx];
+		TypeIndex subTypeIdx = GetTypeIndex(subNode, sc);
+		BNS_VEC_FOREACH(sc->knownTypes) {
+			if (ptr->type == TypeInfo::UE_PointerTypeInfo) {
+				if (((PointerTypeInfo*)ptr->PointerTypeInfo_data)->subType == subTypeIdx) {
+					return (ptr - sc->knownTypes.data);
+				}
+			}
+		}
+
+		PointerTypeInfo newInfo;
+		newInfo.subType = subTypeIdx;
+		TypeInfo info;
+		info = newInfo;
+		sc->knownTypes.PushBack(info);
+		return sc->knownTypes.count - 1;
+	}
 	else {
 		// TODO: Pointer, Array, Generic
 		ASSERT(false);
@@ -388,7 +407,34 @@ TypeCheckResult DoTypeChecking(ASTNode* node, SemanticContext* sc, FuncDef* curr
 	case ANT_StructDefinition: {
 		// Err..we already did this?
 		return TCR_Success;
-	};
+	} break;
+
+	case ANT_VariableAssign: {
+		ASTIndex varIdx = node->VariableAssign_value.var;
+		ASTIndex valIdx = node->VariableAssign_value.val;
+		ASTNode* var = &node->ast->nodes.data[varIdx];
+		ASTNode* val = &node->ast->nodes.data[valIdx];
+		
+		// TODO: Check LValue here
+		TypeIndex varType, valType;
+		TypeCheckResult varRes = TypeCheckValue(var, sc, &varType);
+		TypeCheckResult valRes = TypeCheckValue(val, sc, &valType);
+
+		if (varRes == TCR_Success && valRes == TCR_Success && varType == valType) {
+			return TCR_Success;
+		}
+		else {
+			return TCR_Error;
+		}
+	} break;
+
+	case ANT_Parentheses:
+	case ANT_FunctionCall:
+	case ANT_UnaryOp:
+	case ANT_BinaryOp: {
+		int valType;
+		return TypeCheckValue(node, sc, &valType);
+	} break;
 
 	case ANT_FunctionDefinition: {
 		// Err..we already did this?
