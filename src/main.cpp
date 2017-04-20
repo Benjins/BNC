@@ -2,6 +2,8 @@
 
 #include "AST.cpp"
 #include "semantics.cpp"
+#include "backend.cpp"
+#include "bytecode.cpp"
 #include "../CppUtils/vector.cpp"
 #include "../CppUtils/assert.cpp"
 #include "../CppUtils/strings.cpp"

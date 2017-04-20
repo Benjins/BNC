@@ -410,13 +410,11 @@ bool ParseType(TokenStream* stream) {
 					// deal_with_it.gif
 					else { success = false; break; }
 				}
-				else if (ExpectAndEatWord(stream, "..")) {
-					if (ExpectAndEatWord(stream, "]")) {
-						ASTNode* node = stream->ast->addNode();
-						node->type = ANT_TypeArray;
-						node->TypeArray_value.childType = currIdx;
-						node->TypeArray_value.length = ARRAY_DYNAMIC_LEN;
-					}
+				else if (ExpectAndEatWord(stream, "]")) {
+					ASTNode* node = stream->ast->addNode();
+					node->type = ANT_TypeArray;
+					node->TypeArray_value.childType = currIdx;
+					node->TypeArray_value.length = ARRAY_DYNAMIC_LEN;
 				}
 				else { success = false; break; }
 			}

@@ -44,6 +44,19 @@ make_vec :: (x: float, y: float, z: float) -> vec3 {
 }
 */
 
+cc: int[];
+
+fg :: () -> int[] {
+	return cc;
+}
+
+cc2: int[3];
+
+fg2 :: () -> int[3] {
+	return cc2;
+}
+
+/**
 ci: int = 4;
 
 fg :: () -> int^ {
@@ -57,6 +70,7 @@ get_val :: (x: int^) -> int {
 do_work :: () -> int {
 	return get_val(fg());
 }
+*/
 
 /*
 gg :: () -> int {

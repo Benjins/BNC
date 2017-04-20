@@ -1,5 +1,7 @@
 #include "semantics.h"
 
+#include "backend.h"
+
 TypeCheckResult TypeCheckVarDecl(ASTNode* decl, SemanticContext* sc, int* outTypeIdx, bool addToScope = true);
 TypeCheckResult TypeCheckStructDef(StructDef* def, SemanticContext* sc, AST* ast);
 TypeCheckResult TypeCheckFunctionDef(FuncDef* def, SemanticContext* sc, AST* ast);
@@ -77,6 +79,25 @@ TypeIndex GetOrCreatePtrReferenceOf(TypeIndex subTypeIdx, SemanticContext* sc) {
 	return sc->knownTypes.count - 1;
 }
 
+TypeIndex GetOrCreateArrayTypeOf(TypeIndex subTypeIdx, int len, SemanticContext* sc) {
+	BNS_VEC_FOREACH(sc->knownTypes) {
+		if (ptr->type == TypeInfo::UE_ArrayTypeInfo) {
+			if (((ArrayTypeInfo*)ptr->ArrayTypeInfo_data)->arrayLen == len &&
+				((ArrayTypeInfo*)ptr->ArrayTypeInfo_data)->subType == subTypeIdx) {
+				return (ptr - sc->knownTypes.data);
+			}
+		}
+	}
+
+	ArrayTypeInfo newInfo;
+	newInfo.subType = subTypeIdx;
+	newInfo.arrayLen = len;
+	TypeInfo info;
+	info = newInfo;
+	sc->knownTypes.PushBack(info);
+	return sc->knownTypes.count - 1;
+}
+
 TypeIndex GetTypeIndex(ASTNode* typeNode, SemanticContext* sc) {
 	if (typeNode->type == ANT_TypeSimple) {
 		ASTNode* typeIdent = &typeNode->ast->nodes.data[typeNode->TypeSimple_value.name];
@@ -88,6 +109,29 @@ TypeIndex GetTypeIndex(ASTNode* typeNode, SemanticContext* sc) {
 		ASTNode* subNode = &typeNode->ast->nodes.data[subIdx];
 		TypeIndex subTypeIdx = GetTypeIndex(subNode, sc);
 		return GetOrCreatePtrReferenceOf(subTypeIdx, sc);
+	}
+	else if (typeNode->type == ANT_TypeArray) {
+		ASTIndex subIdx = typeNode->TypeArray_value.childType;
+		ASTNode* subNode = &typeNode->ast->nodes.data[subIdx];
+
+		int arrayLen = ARRAY_DYNAMIC_LEN;
+
+		ASTIndex lenIdx = typeNode->TypeArray_value.length;
+		if (lenIdx != ARRAY_DYNAMIC_LEN) {
+			ASTNode* lenNode = &typeNode->ast->nodes.data[lenIdx];
+
+			BNCBytecodeValue val = CompileTimeInterpretASTExpression(lenNode);
+			if (val.type != BNCBytecodeValue::UE_BNCByteCodeInt) {
+				ASSERT(false);
+				return -1;
+			}
+			else {
+				arrayLen = val.AsBNCByteCodeInt();
+			}
+		}
+
+		TypeIndex subTypeIdx = GetTypeIndex(subNode, sc);
+		return GetOrCreateArrayTypeOf(subTypeIdx, arrayLen, sc);
 	}
 	else {
 		// TODO: Pointer, Array, Generic
