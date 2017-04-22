@@ -261,6 +261,38 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 		}
 	} break;
 
+	case ANT_ArrayAccess: {
+		ASTNode* arrNode = &val->ast->nodes.data[val->ArrayAccess_value.arr];
+		ASTNode* idxNode = &val->ast->nodes.data[val->ArrayAccess_value.index];
+
+		TypeIndex arrTypeIdx;
+		TypeCheckResult arrRes = TypeCheckValue(arrNode, sc, &arrTypeIdx);
+
+		TypeIndex idxTypeIdx;
+		TypeCheckResult idxRes = TypeCheckValue(idxNode, sc, &idxTypeIdx);
+
+		if (arrRes == TCR_Success && idxRes == TCR_Success) {
+			if (sc->knownTypes.data[arrTypeIdx].type == TypeInfo::UE_ArrayTypeInfo) {
+				SubString intSubstr = STATIC_TO_SUBSTRING("int");
+				TypeIndex intTypeIdx = GetSimpleTypeIndex(intSubstr, sc);
+				if (idxTypeIdx == intTypeIdx) {
+					*outTypeIdx = sc->knownTypes.data[arrTypeIdx].AsArrayTypeInfo().subType;
+					return TCR_Success;
+				}
+				else {
+					return TCR_Error;
+				}
+			}
+			else {
+				return TCR_Error;
+			}
+		}
+		else {
+			return TCR_Error;
+		}
+
+	} break;
+
 	case ANT_FunctionCall: {
 		ASTNode* funcVal = &val->ast->nodes.data[val->FunctionCall_value.func];
 		ASSERT(funcVal->type == ANT_Identifier);

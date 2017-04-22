@@ -56,6 +56,24 @@ fg2 :: () -> int[3] {
 	return cc2;
 }
 
+fg3 :: () -> int {
+	return cc[1];
+}
+
+fg4 :: () -> int {
+	return cc2[5];
+}
+
+fg5 :: (a: int) -> int {
+	return cc2[a * 3 - 1];
+}
+
+fArr: float[];
+
+fg6 :: (a: int) -> float {
+	return fArr[a];
+}
+
 /**
 ci: int = 4;
 
