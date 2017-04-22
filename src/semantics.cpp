@@ -373,22 +373,22 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 	case ANT_BoolLiteral: {
 		*outTypeIdx = GetSimpleTypeIndex(STATIC_TO_SUBSTRING("bool"), sc);
 		return TCR_Success;
-	};
+	} break;
 
 	case ANT_StringLiteral: {
 		*outTypeIdx = GetSimpleTypeIndex(STATIC_TO_SUBSTRING("string"), sc);
 		return TCR_Success;
-	};
+	} break;
 
 	case ANT_IntegerLiteral: {
 		*outTypeIdx = GetSimpleTypeIndex(STATIC_TO_SUBSTRING("int"), sc);
 		return TCR_Success;
-	};
+	} break;
 
 	case ANT_FloatLiteral: {
 		*outTypeIdx = GetSimpleTypeIndex(STATIC_TO_SUBSTRING("float"), sc);
 		return TCR_Success;
-	};
+	} break;
 	}
 
 	return TCR_Error;
