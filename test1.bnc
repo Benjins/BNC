@@ -74,6 +74,24 @@ fg6 :: (a: int) -> float {
 	return fArr[a];
 }
 
+KeyPoint :: struct {
+x: float;
+y: float;
+theta: float;
+hashes: int[8];
+}
+
+kpt: KeyPoint;
+
+gkpt :: () -> KeyPoint^ {
+	return kpt^;
+}
+
+do_kpt :: () -> int {
+cd: KeyPoint^ = gkpt();
+	return (^cd).hashes[0];
+}
+
 /**
 ci: int = 4;
 
