@@ -298,6 +298,10 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 		ASSERT(funcVal->type == ANT_Identifier);
 		FuncDef* def = GetFuncDefByName(funcVal->Identifier_value.name, sc);
 
+		if (def == nullptr) {
+			return TCR_Error;
+		}
+
 		if (val->FunctionCall_value.args.count != def->argTypes.count) {
 			// Arity mismatch
 			return TCR_Error;

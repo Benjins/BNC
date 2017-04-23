@@ -272,6 +272,9 @@ bool ParseValue(TokenStream* stream) {
 	if (ParseBinaryOp(stream)) {
 		FRAME_SUCCES();
 	}
+	else if (ParseUnaryOp(stream)) {
+		FRAME_SUCCES();
+	}
 	else if (ParseSingleValue(stream)) {
 		FRAME_SUCCES();
 	}

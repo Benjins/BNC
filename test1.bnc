@@ -44,6 +44,7 @@ make_vec :: (x: float, y: float, z: float) -> vec3 {
 }
 */
 
+
 cc: int[];
 
 fg :: () -> int[] {
@@ -88,8 +89,8 @@ gkpt :: () -> KeyPoint^ {
 }
 
 do_kpt :: () -> int {
-cd: KeyPoint^ = gkpt();
-	return (^cd).hashes[0];
+	cd: KeyPoint^ = gkpt();
+	return ((^cd).hashes[0]);
 }
 
 /**
