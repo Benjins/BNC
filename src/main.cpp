@@ -20,6 +20,10 @@ int main(int argc, char** argv){
 
 	SemanticContext sc;
 	DoSemantics(&ast, &sc);
+
+	printf("==============\n");
+	OutputASTToCCode(&ast.nodes.Back(), stdout);
+	printf("==============\n");
 	
 	return 0;
 }

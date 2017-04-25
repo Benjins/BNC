@@ -10,4 +10,6 @@ bool CompileASTExpressionToByteCode(ASTNode* node, Vector<int>* outCode);
 
 BNCBytecodeValue CompileTimeInterpretASTExpression(ASTNode* node);
 
+void OutputASTToCCode(ASTNode* node, FILE* fileHandle);
+
 #endif

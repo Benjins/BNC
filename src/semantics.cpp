@@ -346,6 +346,10 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 		ASTNode* subVal = &val->ast->nodes.data[val->UnaryOp_value.val];
 		TypeCheckResult sRes = TypeCheckValue(subVal, sc, &lType);
 
+		if (sRes != TCR_Success) {
+			return TCR_Error;
+		}
+
 		if (StrEqual(val->UnaryOp_value.op, "^")) {
 			if (val->UnaryOp_value.isPre) {
 				if (sc->knownTypes.data[lType].type == TypeInfo::UE_PointerTypeInfo) {
@@ -364,13 +368,8 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 			}
 		}
 		else {
-			if (sRes == TCR_Success) {
-				*outTypeIdx = lType;
-				return TCR_Success;
-			}
-			else {
-				return TCR_Error;
-			}
+			*outTypeIdx = lType;
+			return TCR_Success;
 		}
 	} break;
 

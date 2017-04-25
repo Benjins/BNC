@@ -1,15 +1,31 @@
-/*vec3 :: struct {
-	x: float = 0;
-	y: float = 0;
-	z: float = 0;
+/*
+vec3 :: struct {
+	x: float = 0.0;
+	y: float = 0.0;
+	z: float = 0.0;
 }
 
 ms :: struct {
 	x : float;
-	y : float^ [1+22*4+1] ^;
-	z : int[..];
-	w : GG(int, float);
-}*/
+	y : float^ [1+22*4+1];
+	z : int[];
+	//w : GG(int, float);
+}
+
+ms_ld :: (m: ms^, i: int) -> float {
+	return ^((^m).y[i]);
+}
+*/
+
+fg :: (m: int^) -> int {
+	return ^m * 2;
+}
+
+gg :: (a: int, b : int) -> int {
+	fa: int = fg(a^);
+	fb: int = fg(b^);
+	return fa * fb;
+}
 
 /*
 y: float^[1 + 22 * 4 + 1]^ = 4;
@@ -44,7 +60,7 @@ make_vec :: (x: float, y: float, z: float) -> vec3 {
 }
 */
 
-
+/*
 cc: int[];
 
 fg :: () -> int[] {
@@ -92,6 +108,7 @@ do_kpt :: () -> int {
 	cd: KeyPoint^ = gkpt();
 	return ((^cd).hashes[0]);
 }
+*/
 
 /**
 ci: int = 4;
