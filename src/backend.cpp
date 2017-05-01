@@ -1,6 +1,6 @@
 #include "backend.h"
 
-void OutputASTToCCode(ASTNode* node, FILE* fileHandle) {
+void OutputASTToCCode(ASTNode* node, FILE* fileHandle, bool writeVarDeclInit /*= true*/) {
 	ASSERT(node != nullptr);
 
 	switch (node->type) {
@@ -34,6 +34,23 @@ void OutputASTToCCode(ASTNode* node, FILE* fileHandle) {
 			fprintf(fileHandle, " = ");
 			OutputASTToCCode(initNode, fileHandle);
 		}
+	} break;
+
+	case ANT_StructDefinition: {
+		ASTNode* name = &node->ast->nodes.data[node->StructDefinition_value.structName];
+
+		fprintf(fileHandle, "struct ");
+		OutputASTToCCode(name, fileHandle);
+		fprintf(fileHandle, " {\n");
+
+		BNS_VEC_FOREACH(node->StructDefinition_value.fieldDecls) {
+			ASTNode* field = &node->ast->nodes.data[*ptr];
+			OutputASTToCCode(field, fileHandle);
+			fprintf(fileHandle, ";\n");
+		}
+
+		fprintf(fileHandle, " };\n");
+
 	} break;
 
 	case ANT_FunctionDefinition: {
