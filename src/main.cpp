@@ -22,7 +22,7 @@ int main(int argc, char** argv){
 	DoSemantics(&ast, &sc);
 
 	printf("==============\n");
-	OutputASTToCCode(&ast.nodes.Back(), stdout);
+	OutputASTToCCode(&ast.nodes.Back(), &sc, stdout);
 	printf("==============\n");
 	
 	return 0;

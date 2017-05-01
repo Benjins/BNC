@@ -120,7 +120,7 @@ TypeIndex GetTypeIndex(ASTNode* typeNode, SemanticContext* sc) {
 		if (lenIdx != ARRAY_DYNAMIC_LEN) {
 			ASTNode* lenNode = &typeNode->ast->nodes.data[lenIdx];
 
-			BNCBytecodeValue val = CompileTimeInterpretASTExpression(lenNode);
+			BNCBytecodeValue val = CompileTimeInterpretASTExpression(lenNode, sc);
 			if (val.type != BNCBytecodeValue::UE_BNCByteCodeInt) {
 				ASSERT(false);
 				return -1;
