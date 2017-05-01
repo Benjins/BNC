@@ -3,6 +3,20 @@ vec3 :: struct {
 	y: float = 0.0;
 	z: float = 0.0;
 }
+
+vec3Arr :: struct {
+first: vec3;
+second: vec3;
+next: vec3Arr^;
+prev: vec3Arr^;
+}
+
+vec3ArrList :: struct {
+head: vec3Arr^;
+tail: vec3Arr^;
+//small: vec3[];
+}
+
 /*
 
 ms :: struct {

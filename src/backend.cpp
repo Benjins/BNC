@@ -1,5 +1,59 @@
 #include "backend.h"
 
+bool OutputStructDeclarations(SemanticContext* sc, AST* ast, FILE* fileHandle) {
+	BNS_VEC_FOREACH(sc->definedStructs) {
+		fprintf(fileHandle, "struct %.*s;\n", BNS_LEN_START(ptr->name));
+	}
+
+	Vector<StructDef> structsToDefine = sc->definedStructs;
+	while (structsToDefine.count > 0) {
+		bool madeProgress = false;
+		BNS_VEC_FOREACH(structsToDefine) {
+			bool canBeDefined = true;
+			BNS_VEC_FOREACH_NAME(ptr->fieldDecls, fieldPtr) {
+				TypeInfo fType = sc->knownTypes.data[fieldPtr->typeIndex];
+				if (fType.type == TypeInfo::UE_StructTypeInfo) {
+					BNS_VEC_FOREACH_NAME(structsToDefine, defPtr) {
+						if (defPtr->idx == sc->definedStructs.data[fType.AsStructTypeInfo().index].idx) {
+							canBeDefined = false;
+							break;
+						}
+					}
+				}
+
+				if (!canBeDefined) { break; }
+			}
+
+			if (canBeDefined) {
+
+				fprintf(fileHandle, "typedef struct {\n");
+				BNS_VEC_FOREACH_NAME(ptr->fieldDecls, declPtr) {
+					ASTNode* node = &ast->nodes.data[declPtr->idx];
+					fprintf(fileHandle, "\t");
+					OutputASTToCCode(node, sc, fileHandle, false);
+					fprintf(fileHandle, ";\n");
+				}
+				fprintf(fileHandle, "} %.*s;\n", BNS_LEN_START(ptr->name));
+
+				StructDef temp = *ptr;
+				*ptr = structsToDefine.data[structsToDefine.count - 1];
+				structsToDefine.data[structsToDefine.count - 1] = temp;
+				structsToDefine.PopBack();
+				ptr--;
+				madeProgress = true;
+			}
+		}
+
+		if (!madeProgress) {
+			printf("Error, could not make progress in struct definition graph.\n");
+			ASSERT(false);
+			return false;
+		}
+	}
+
+	return true;
+}
+
 void OutputASTToCCode(ASTNode* node, SemanticContext* sc, FILE* fileHandle, bool writeVarDeclInit /*= true*/) {
 	ASSERT(node != nullptr);
 
@@ -30,13 +84,14 @@ void OutputASTToCCode(ASTNode* node, SemanticContext* sc, FILE* fileHandle, bool
 		fprintf(fileHandle, " ");
 		OutputASTToCCode(varNode, sc, fileHandle);
 
-		if (initNode != nullptr) {
+		if (writeVarDeclInit && initNode != nullptr) {
 			fprintf(fileHandle, " = ");
 			OutputASTToCCode(initNode, sc, fileHandle);
 		}
 	} break;
 
 	case ANT_StructDefinition: {
+		/*
 		ASTNode* name = &node->ast->nodes.data[node->StructDefinition_value.structName];
 
 		fprintf(fileHandle, "struct ");
@@ -50,7 +105,8 @@ void OutputASTToCCode(ASTNode* node, SemanticContext* sc, FILE* fileHandle, bool
 		}
 
 		fprintf(fileHandle, " };\n");
-
+		*/
+		// We already did this above.
 	} break;
 
 	case ANT_FunctionDefinition: {
@@ -152,6 +208,7 @@ void OutputASTToCCode(ASTNode* node, SemanticContext* sc, FILE* fileHandle, bool
 	} break;
 
 	case ANT_Root: {
+		OutputStructDeclarations(sc, node->ast, fileHandle);
 		BNS_VEC_FOREACH(node->Root_value.topLevelStatements) {
 			ASTNode* stmt = &node->ast->nodes.data[*ptr];
 			OutputASTToCCode(stmt, sc, fileHandle);
