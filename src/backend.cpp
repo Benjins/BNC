@@ -26,14 +26,14 @@ bool OutputStructDeclarations(SemanticContext* sc, AST* ast, FILE* fileHandle) {
 
 			if (canBeDefined) {
 
-				fprintf(fileHandle, "typedef struct {\n");
+				fprintf(fileHandle, "struct %.*s {\n", BNS_LEN_START(ptr->name));
 				BNS_VEC_FOREACH_NAME(ptr->fieldDecls, declPtr) {
 					ASTNode* node = &ast->nodes.data[declPtr->idx];
 					fprintf(fileHandle, "\t");
 					OutputASTToCCode(node, sc, fileHandle, false);
 					fprintf(fileHandle, ";\n");
 				}
-				fprintf(fileHandle, "} %.*s;\n", BNS_LEN_START(ptr->name));
+				fprintf(fileHandle, "};\n");
 
 				StructDef temp = *ptr;
 				*ptr = structsToDefine.data[structsToDefine.count - 1];
@@ -54,7 +54,28 @@ bool OutputStructDeclarations(SemanticContext* sc, AST* ast, FILE* fileHandle) {
 	return true;
 }
 
+void OutputFunctionHeaderToCCode(ASTNode* node, SemanticContext* sc, FILE* fileHandle) {
+	OutputASTToCCode(&node->ast->nodes.data[node->FunctionDefinition_value.returnType], sc, fileHandle);
+	fprintf(fileHandle, " ");
+	OutputASTToCCode(&node->ast->nodes.data[node->FunctionDefinition_value.name], sc, fileHandle);
+	fprintf(fileHandle, "(");
+	bool first = true;
+	BNS_VEC_FOREACH(node->FunctionDefinition_value.params) {
+		if (!first) {
+			fprintf(fileHandle, ", ");
+		}
+
+		ASTNode* param = &node->ast->nodes.data[*ptr];
+		OutputASTToCCode(param, sc, fileHandle);
+
+		first = false;
+	}
+	fprintf(fileHandle, ")");
+}
+
 void OutputASTToCCode(ASTNode* node, SemanticContext* sc, FILE* fileHandle, bool writeVarDeclInit /*= true*/) {
+//#define RECUR(subnode) OutputASTToCCode(&node->ast->nodes.data[node->TypeSimple_value.name], sc, fileHandle);
+
 	ASSERT(node != nullptr);
 
 	switch (node->type) {
@@ -64,6 +85,13 @@ void OutputASTToCCode(ASTNode* node, SemanticContext* sc, FILE* fileHandle, bool
 	case ANT_BoolLiteral:    { fprintf(fileHandle, "%s", node->BoolLiteral_value.val ? "true" : "false"); } break;
 
 	case ANT_TypeSimple: {
+		const SubString& typeName = node->ast->nodes.data[node->TypeSimple_value.name].Identifier_value.name;
+		TypeIndex typeIdx = GetSimpleTypeIndex(typeName, sc);
+
+		if (sc->knownTypes.data[typeIdx].type == TypeInfo::UE_StructTypeInfo) {
+			fprintf(fileHandle, "struct ");
+		}
+
 		OutputASTToCCode(&node->ast->nodes.data[node->TypeSimple_value.name], sc, fileHandle);
 	} break;
 
@@ -110,22 +138,7 @@ void OutputASTToCCode(ASTNode* node, SemanticContext* sc, FILE* fileHandle, bool
 	} break;
 
 	case ANT_FunctionDefinition: {
-		OutputASTToCCode(&node->ast->nodes.data[node->FunctionDefinition_value.returnType], sc, fileHandle);
-		fprintf(fileHandle, " ");
-		OutputASTToCCode(&node->ast->nodes.data[node->FunctionDefinition_value.name], sc, fileHandle);
-		fprintf(fileHandle, "(");
-		bool first = true;
-		BNS_VEC_FOREACH(node->FunctionDefinition_value.params) {
-			if (!first) {
-				fprintf(fileHandle, ", ");
-			}
-
-			ASTNode* param = &node->ast->nodes.data[*ptr];
-			OutputASTToCCode(param, sc, fileHandle);
-
-			first = false;
-		}
-		fprintf(fileHandle, ")\n");
+		OutputFunctionHeaderToCCode(node, sc, fileHandle);
 
 		ASTNode* body = &node->ast->nodes.data[node->FunctionDefinition_value.bodyScope];
 		OutputASTToCCode(body, sc, fileHandle);
@@ -208,7 +221,17 @@ void OutputASTToCCode(ASTNode* node, SemanticContext* sc, FILE* fileHandle, bool
 	} break;
 
 	case ANT_Root: {
+		fprintf(fileHandle, "\n//Struct definitions\n");
 		OutputStructDeclarations(sc, node->ast, fileHandle);
+
+		fprintf(fileHandle, "\n//Function declarations\n");
+		BNS_VEC_FOREACH(sc->definedFunctions) {
+			ASTNode* funcNode = &node->ast->nodes.data[ptr->idx];
+			OutputFunctionHeaderToCCode(funcNode, sc, fileHandle);
+			fprintf(fileHandle, ";\n");
+		}
+
+		fprintf(fileHandle, "\n//Function definitions\n");
 		BNS_VEC_FOREACH(node->Root_value.topLevelStatements) {
 			ASTNode* stmt = &node->ast->nodes.data[*ptr];
 			OutputASTToCCode(stmt, sc, fileHandle);
