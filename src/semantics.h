@@ -5,6 +5,7 @@
 
 #include "../CppUtils/vector.h"
 #include "../CppUtils/disc_union.h"
+#include "../CppUtils/bitset.h"
 
 #include "AST.h"
 
@@ -62,12 +63,14 @@ struct FuncDef {
 	SubString name;
 	TypeIndex retType;
 	Vector<TypeIndex> argTypes;
+	bool doneChecking;
 };
 
 struct StructDef {
 	ASTIndex idx;
 	SubString name;
 	Vector<VariableDecl> fieldDecls;
+	bool doneChecking;
 };
 
 struct ScopeStackFrame {
@@ -82,8 +85,11 @@ struct SemanticContext {
 	Vector<VariableDecl> varsInScope;
 	Vector<FuncDef> definedFunctions;
 	Vector<StructDef> definedStructs;
+	Vector<ASTIndex> globalVarDecls;
 
 	Vector<ScopeStackFrame> scopeFrames;
+
+	BitSet nodesDone;
 
 	void PushScope() {
 		ScopeStackFrame frame;
@@ -124,5 +130,31 @@ struct __PushPopSCScope {
 
 void DoSemantics(AST* ast, SemanticContext* sc);
 
+struct IdentifierStruct {
+	int structIdx;
+};
+
+struct IdentifierFunction {
+	int funcIdx;
+};
+
+struct IdentifierVariable {
+	int varIdx;
+};
+
+struct IdentifierUnknown {
+};
+
+#define DISC_MAC(mac) \
+	mac(IdentifierStruct) \
+	mac(IdentifierFunction) \
+	mac(IdentifierVariable) \
+	mac(IdentifierUnknown)
+
+DEFINE_DISCRIMINATED_UNION(ResolvedIdentifer, DISC_MAC)
+
+#undef DISC_MAC
+
+ResolvedIdentifer ResolveIdentifier(const SubString& str, SemanticContext* sc);
 
 #endif

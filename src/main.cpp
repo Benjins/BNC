@@ -8,6 +8,7 @@
 #include "../CppUtils/assert.cpp"
 #include "../CppUtils/strings.cpp"
 #include "../CppUtils/lexer.cpp"
+#include "../CppUtils/bitset.cpp"
 
 int main(int argc, char** argv){
 	String code = ReadStringFromFile("test1.bnc");
@@ -16,7 +17,7 @@ int main(int argc, char** argv){
 	ast.ConstructFromString(code);
 
 	FixUpOperators(&ast.nodes.Back());
-	DisplayTree(&ast.nodes.Back());
+	//DisplayTree(&ast.nodes.Back());
 
 	SemanticContext sc;
 	DoSemantics(&ast, &sc);

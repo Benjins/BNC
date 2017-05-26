@@ -52,14 +52,15 @@ TypeIndex GetTypeOfField(StructDef* def, const SubString& name, SemanticContext*
 	return -1;
 }
 
-TypeIndex GetTypeofVariable(SubString name, SemanticContext* sc) {
+bool GetTypeofVariable(SubString name, SemanticContext* sc, TypeIndex* outTypeIndex) {
 	BNS_VEC_FOREACH(sc->varsInScope) {
 		if (ptr->name == name) {
-			return ptr->typeIndex;
+			*outTypeIndex = ptr->typeIndex;
+			return true;
 		}
 	}
 
-	return -1;
+	return false;
 }
 
 TypeIndex GetOrCreatePtrReferenceOf(TypeIndex subTypeIdx, SemanticContext* sc) {
@@ -140,13 +141,62 @@ TypeIndex GetTypeIndex(ASTNode* typeNode, SemanticContext* sc) {
 	}
 }
 
+TypeCheckResult StepSemantics(AST* ast, SemanticContext* sc) {
+	bool progress = false;
+	bool success = true;
+	BNS_VEC_FOREACH(sc->definedStructs) {
+		TypeCheckResult res = TypeCheckStructDef(ptr, sc, ast);
+		if (res == TCR_Error) {
+			printf("Failed to type-check struct.\n");
+			return res;
+		}
+		else if (res != TCR_NoProgress) {
+			success &= (res == TCR_Success);
+			progress = true;
+		}
+	}
+
+	Vector<VariableDecl> globalvars = sc->varsInScope;
+	sc->varsInScope.Clear();
+
+	BNS_VEC_FOREACH(globalvars) {
+		ASTNode* stmt = &ast->nodes.data[ptr->idx];
+		ASSERT(stmt->type == ANT_VariableDecl);
+
+		int typeIdx;
+		TypeCheckResult res = TypeCheckVarDecl(stmt, sc, &typeIdx);
+		if (res == TCR_Error) {
+			printf("Failed to typecheck var decl\n");
+			return res;
+		}
+		else if (res != TCR_NoProgress) {
+			success &= (res == TCR_Success);
+			progress = true;
+		}
+	}
+
+	BNS_VEC_FOREACH(sc->definedFunctions) {
+		TypeCheckResult res = TypeCheckFunctionDef(ptr, sc, ast);
+		if (res == TCR_Error) {
+			printf("Failed to type-check func def.\n");
+		}
+		else if (res != TCR_NoProgress) {
+			success &= (res == TCR_Success);
+			progress = true;
+		}
+	}
+
+	if (success) { return TCR_Success; }
+	else if (progress) { return TCR_SomeProgress; }
+	else { return TCR_NoProgress; }
+}
+
 void DoSemantics(AST* ast, SemanticContext* sc) {
 	ASTNode* root = &ast->nodes.Back();
 
 	InitSemanticContextWithBuiltinTypes(sc);
 
 	const Vector<ASTIndex>& topStmts = root->Root_value.topLevelStatements;
-	Vector<ASTIndex> globalVarDecls;
 	BNS_VEC_FOREACH(topStmts) {
 		ASTNode* topStmt = &ast->nodes.data[*ptr];
 		if (topStmt->type == ANT_FunctionDefinition) {
@@ -165,6 +215,7 @@ void DoSemantics(AST* ast, SemanticContext* sc) {
 			StructTypeInfo str;
 			ASTIndex structNameIdx = ast->nodes.data[*ptr].StructDefinition_value.structName;
 			str.name = ast->nodes.data[structNameIdx].Identifier_value.name;
+			sc->definedStructs.Back().name = str.name;
 			str.index = sc->definedStructs.count - 1;
 			info = str;
 
@@ -173,47 +224,41 @@ void DoSemantics(AST* ast, SemanticContext* sc) {
 		else if (topStmt->type == ANT_Statement) {
 			ASTNode* stmt = &ast->nodes.data[topStmt->Statement_value.root];
 			if (stmt->type == ANT_VariableDecl) {
-				globalVarDecls.PushBack(stmt->GetIndex());
+				sc->globalVarDecls.PushBack(stmt->GetIndex());
+				VariableDecl vardecl;
+				vardecl.idx = stmt->GetIndex();
+				vardecl.name = stmt->ast->nodes.data[stmt->VariableDecl_value.varName].Identifier_value.name;
+				vardecl.typeIndex = -1;
+				sc->varsInScope.PushBack(vardecl);
 			}
 		}
 	}
 
-	BNS_VEC_FOREACH(sc->definedStructs) {
-		TypeCheckResult res = TypeCheckStructDef(ptr, sc, ast);
-		if (res != TCR_Success) {
-			printf("Failed to type-check struct.\n");
-		}
-		else {
-			printf("Type checking worked!\n");
-		}
+	sc->nodesDone.EnsureCapacity(ast->nodes.count);
+	sc->nodesDone.Clear();
+
+	TypeCheckResult result = TCR_SomeProgress;
+	while (result == TCR_SomeProgress) {
+		result = StepSemantics(ast, sc);
 	}
 
-	BNS_VEC_FOREACH(globalVarDecls) {
-		ASTNode* stmt = &ast->nodes.data[*ptr];
-		ASSERT(stmt->type == ANT_VariableDecl);
-
-		int typeIdx;
-		TypeCheckResult res = TypeCheckVarDecl(stmt, sc, &typeIdx);
-		if (res == TCR_Error) {
-			printf("Failed to typecheck var decl\n");
-		}
+	if (result == TCR_Success) {
+		printf("Type checking succeeded\n");
 	}
-
-	BNS_VEC_FOREACH(sc->definedFunctions) {
-		TypeCheckResult res = TypeCheckFunctionDef(ptr, sc, ast);
-		if (res != TCR_Success) {
-			printf("Failed to type-check func def.\n");
-		}
-		else {
-			printf("Type checking worked!\n");
-		}
+	else if (result == TCR_Error) {
+		printf("Type checking error\n");
+	}
+	else if (result == TCR_NoProgress) {
+		printf("Type checking encountered no progress situation.\n");
+	}
+	else {
+		ASSERT(false);
 	}
 }
 
 TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeIdx) {
 	switch (val->type) {
 	case ANT_BinaryOp: {
-		
 		ASTNode* left  = &val->ast->nodes.data[val->BinaryOp_value.left];
 		ASTNode* right = &val->ast->nodes.data[val->BinaryOp_value.right];
 		if (StrEqual(val->BinaryOp_value.op, ".")) {
@@ -243,7 +288,7 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 				}
 			}
 			else {
-				return TCR_Error;
+				return lRes;
 			}
 		}
 		else {
@@ -332,13 +377,19 @@ TypeCheckResult TypeCheckValue(ASTNode* val, SemanticContext* sc, int* outTypeId
 	} break;
 
 	case ANT_Identifier: {
-		TypeIndex idx = GetTypeofVariable(val->Identifier_value.name, sc);
-		if (idx == -1) {
+		TypeIndex idx;
+		if (GetTypeofVariable(val->Identifier_value.name, sc, &idx)) {
+			if (idx == -1) {
+				return TCR_NoProgress;
+			}
+			else {
+				*outTypeIdx = idx;
+				return TCR_Success;
+			}
+		}
+		else {
 			return TCR_Error;
 		}
-
-		*outTypeIdx = idx;
-		return TCR_Success;
 	} break;
 
 	case ANT_UnaryOp: {
@@ -423,8 +474,8 @@ TypeCheckResult TypeCheckVarDecl(ASTNode* decl, SemanticContext* sc, int* outTyp
 	int valTypeIdx;
 	ASTNode* val = &decl->ast->nodes.data[valNodeIdx];
 	TypeCheckResult vRes = TypeCheckValue(val, sc, &valTypeIdx);
-	if (vRes == TCR_Error) {
-		return TCR_Error;
+	if (vRes != TCR_Success) {
+		return vRes;
 	}
 	else if (varTypeIdx == valTypeIdx) {
 		*outTypeIdx = varTypeIdx;
@@ -586,5 +637,43 @@ TypeCheckResult DoTypeChecking(ASTNode* node, SemanticContext* sc, FuncDef* curr
 
 	ASSERT(false);
 	return TCR_Error;
+}
+
+ResolvedIdentifer ResolveIdentifier(const SubString& str, SemanticContext* sc) {
+	BNS_VEC_FOREACH(sc->definedStructs) {
+		if (ptr->name == str) {
+			int idx = ptr - sc->definedStructs.data;
+			IdentifierStruct res;
+			res.structIdx = idx;
+			ResolvedIdentifer ident;
+			ident = res;
+			return ident;
+		}
+	}
+
+	BNS_VEC_FOREACH(sc->definedFunctions) {
+		if (ptr->name == str) {
+			int idx = ptr - sc->definedFunctions.data;
+			IdentifierFunction res;
+			res.funcIdx = idx;
+			ResolvedIdentifer ident;
+			ident = res;
+			return ident;
+		}
+	}
+
+	for (int i = sc->varsInScope.count - 1; i >= 0; i--) {
+		if (sc->varsInScope.data[i].name == str) {
+			IdentifierVariable var;
+			var.varIdx = i;
+			ResolvedIdentifer ident;
+			ident = var;
+			return ident;
+		}
+	}
+
+	ResolvedIdentifer ident;
+	ident = IdentifierUnknown();
+	return ident;
 }
 

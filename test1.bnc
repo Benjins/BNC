@@ -1,5 +1,7 @@
+ZERO: float = 0.0;
+
 vec3 :: struct {
-	x: float = 0.0;
+	x: float = ZERO;
 	y: float = 0.0;
 	z: float = 0.0;
 }
